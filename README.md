@@ -106,17 +106,25 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 
 前置：DSH 桌面版（本插件按 `0.2.1-rc.5` 实测）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
 
+### 方式一：直接从 GitHub 安装（推荐）
+
+```bash
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
+```
+
+- `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
+- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git`。
+- 想固定版本就带 commit：`github:realchendahuang/dsh-provider-studio#<commit-sha>`。
+- pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
+
+### 方式二：克隆到本地（开发 / 改代码）
+
 ```bash
 git clone https://github.com/realchendahuang/dsh-provider-studio.git ~/code/dsh-provider-studio
-dsh plugin --profile <profile> add /path/to/dsh-provider-studio
-```
-
-- `<profile>` 换成你的 DSH profile（如 `desktop`、`web`）。安装本地目录会以 pnpm `link:` 依赖写入该 profile，不复制文件；之后更新仓库内容不需要重新 `add`。
-- 建议把仓库放在固定路径，例如 `~/code/dsh-provider-studio`，然后：
-
-```bash
 dsh plugin --profile desktop add ~/code/dsh-provider-studio
 ```
+
+- 本地目录以 pnpm `link:` 依赖写入 profile，不复制文件；之后 `git pull`、改源码都不用重新 `add`。
 
 ### 重启 DSH 后生效
 
@@ -130,7 +138,14 @@ dsh plugin --profile desktop add ~/code/dsh-provider-studio
 
 ### 更新
 
-本地 link 安装下，改完源码后：
+- **GitHub 安装**：先 remove 再 add（或直接带新 commit 重新 add）：
+
+```bash
+dsh plugin --profile desktop remove dsh-provider-studio
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
+```
+
+- **本地 link 安装**：`git pull` 后按需构建：
 
 ```bash
 cd ~/code/dsh-provider-studio
@@ -138,7 +153,7 @@ npm install            # 只有改了依赖或首次开发时才需要
 npm run build:client   # 只有改了 src/client/ 时才需要；生成的 client.js 要保留
 ```
 
-然后重启 DSH。Host 端 `index.js` / `contract.js` 是手写 ESM，无需构建。
+改完重启 DSH。Host 端 `index.js` / `contract.js` 是手写 ESM，无需构建。
 
 ### 卸载
 
