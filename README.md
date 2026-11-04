@@ -213,6 +213,10 @@ npm run build:client   # 改了 src/client/ 之后需要
 - 模板与模型 ID 只是预填建议，不代表账户一定有权限调用。
 - 按 DSH `0.2.1-rc.5` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配。
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=realchendahuang/dsh-provider-studio&type=Date)](https://star-history.com/#realchendahuang/dsh-provider-studio&Date)
+
 ## License
 
 [MIT](LICENSE) © 2026 dsh-provider-studio contributors
