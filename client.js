@@ -4334,7 +4334,6 @@ window.__ModuleLoader__.load({
     // src/client/styles.js
     var CSS = `
     .dpp-root{
-      --dpp-mono:var(--dsw-font-mono,ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace);
       --dpp-fg:var(--dsw-alias-label-primary,#17181a);
       --dpp-fg2:var(--dsw-alias-label-secondary,#5b6070);
       --dpp-fg3:var(--dsw-alias-label-tertiary,#8a8f9d);
@@ -4376,7 +4375,7 @@ window.__ModuleLoader__.load({
     .dpp-root h2,.dpp-root h3,.dpp-root h4{font-family:inherit}
     .dpp-root ::selection{background:var(--dpp-brandSoft2)}
     .dpp-i{display:block;flex:none}
-    .dpp-mono{font-family:var(--dpp-mono);font-size:11.5px;letter-spacing:-.01em}
+    .dpp-mono{font-size:11.5px;letter-spacing:0}
     .dpp-srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
     /* ------------------------------------------------------------------ motion */
@@ -4440,7 +4439,7 @@ window.__ModuleLoader__.load({
     .dpp-input:hover:not(:disabled):not(:focus){border-color:var(--dpp-line2)}
     .dpp-input:focus{outline:0;border-color:var(--dpp-brand);box-shadow:0 0 0 3px var(--dpp-brandSoft)}
     .dpp-input:disabled{background:var(--dpp-surface2);color:var(--dpp-fg3);cursor:not-allowed}
-    .dpp-inputMono{font-family:var(--dpp-mono);font-size:12px;letter-spacing:-.01em}
+    .dpp-inputMono{font-size:12.5px;letter-spacing:0}
     .dpp-inputSearch{padding-left:30px;padding-right:30px}
     .dpp-readonly{display:flex;align-items:center;min-height:32px;padding:0 10px;border:1px solid var(--dpp-line1);border-radius:var(--dpp-r-sm);background:var(--dpp-surface2);color:var(--dpp-fg2);font-size:12.5px}
     .dpp-field{display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -4529,7 +4528,7 @@ window.__ModuleLoader__.load({
 
     /* ------------------------------------------------------------------ badges */
     .dpp-badge{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:5px;background:var(--dpp-fill);color:var(--dpp-fg2);font-size:10.5px;font-weight:500;letter-spacing:.01em;white-space:nowrap}
-    .dpp-badgeMono{font-family:var(--dpp-mono);font-size:10px;letter-spacing:-.01em;color:var(--dpp-fg3)}
+    .dpp-badgeMono{font-size:10px;letter-spacing:0;color:var(--dpp-fg3)}
     .dpp-result{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;border-radius:5px;font-size:10.5px;font-weight:500;white-space:nowrap;animation:dppFadeIn var(--dpp-t) var(--dpp-ease)}
     .dpp-result.is-ok{background:var(--dpp-okSoft);color:var(--dpp-okLabel)}
     .dpp-result.is-err{background:var(--dpp-badSoft);color:var(--dpp-badLabel)}
@@ -4539,7 +4538,7 @@ window.__ModuleLoader__.load({
     .dpp-modelRow{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 6px 0 10px;animation:dppRowIn var(--dpp-t) var(--dpp-ease) backwards;animation-delay:calc(var(--dpp-i,0) * 12ms);transition:background var(--dpp-t-fast)}
     .dpp-modelRow + .dpp-modelRow{border-top:1px solid var(--dpp-line1)}
     .dpp-modelRow:hover{background:var(--dpp-surface2)}
-    .dpp-modelName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0;border:0;background:none;color:var(--dpp-fg);font-family:var(--dpp-mono);font-size:12px;letter-spacing:-.01em;text-align:left;cursor:pointer;transition:color var(--dpp-t)}
+    .dpp-modelName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0;border:0;background:none;color:var(--dpp-fg);font-size:12.5px;letter-spacing:0;text-align:left;cursor:pointer;transition:color var(--dpp-t)}
     .dpp-modelName:hover:not(:disabled){color:var(--dpp-brand)}
     .dpp-modelName:disabled{cursor:default}
     .dpp-modelBadges{display:flex;align-items:center;gap:4px;flex:none}
@@ -4577,7 +4576,7 @@ window.__ModuleLoader__.load({
     .dpp-pickRow:hover .dpp-checkbox{border-color:var(--dpp-fg4)}
     .dpp-checkbox.is-on{background:var(--dpp-brand);border-color:var(--dpp-brand);animation:dppPop var(--dpp-t) var(--dpp-ease)}
     .dpp-pickMain{display:flex;align-items:center;min-width:0;flex:1}
-    .dpp-pickId{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--dpp-mono);font-size:12px;letter-spacing:-.01em}
+    .dpp-pickId{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;letter-spacing:0}
     .dpp-pickEmpty{display:flex;align-items:center;justify-content:center;gap:8px;padding:36px 0;color:var(--dpp-fg3);font-size:12px}
 
     /* -------------------------------------------------------------------- tpls */
