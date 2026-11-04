@@ -13,28 +13,32 @@ export const CSS = `
   --dpp-fg:var(--dsw-alias-label-primary,#17181a);
   --dpp-fg2:var(--dsw-alias-label-secondary,#5b6070);
   --dpp-fg3:var(--dsw-alias-label-tertiary,#8a8f9d);
-  --dpp-fg4:var(--dsw-alias-label-quaternary,#a8adba);
+  /* quaternary is not exported by every theme; derive it so both themes stay legible */
+  --dpp-fg4:color-mix(in srgb, var(--dpp-fg) 42%, transparent);
   --dpp-line:var(--dsw-alias-border-l2,#e3e5ea);
   --dpp-line1:var(--dsw-alias-border-l1,#eceef2);
-  --dpp-line2:var(--dsw-alias-border-stronger,#c8ccd5);
+  --dpp-line2:var(--dsw-alias-border-l4,#c8ccd5);
   --dpp-surface:var(--dsw-alias-bg-layer-1,#ffffff);
-  --dpp-surface2:var(--dsw-alias-bg-layer-2,#fafbfc);
-  --dpp-fill:var(--dsw-alias-bg-layer-3,#f2f3f6);
+  /* layer-2/3 can resolve to pure white in the light theme, so derive the subtle
+     surfaces from the text colour instead (works in dark mode too) */
+  --dpp-surface2:color-mix(in srgb, var(--dpp-fg) 3%, var(--dpp-surface));
+  --dpp-fill:color-mix(in srgb, var(--dpp-fg) 5%, var(--dpp-surface));
   --dpp-hover:var(--dsw-alias-interactive-bg-hover,#f2f3f6);
   --dpp-hoverDanger:var(--dsw-alias-interactive-bg-hover-danger,rgba(198,40,40,.08));
-  --dpp-brand:var(--dsw-alias-brand-primary,#3b6df5);
-  --dpp-brandSoft:var(--dsw-alias-brand-primary-alpha-10,rgba(59,109,245,.1));
-  --dpp-brandSoft2:var(--dsw-alias-brand-primary-alpha-15,rgba(59,109,245,.15));
+  --dpp-brand:var(--dsw-alias-button-info-fill,#3b6df5);
+  --dpp-brandSoft:color-mix(in srgb, var(--dpp-brand) 12%, transparent);
+  --dpp-brandSoft2:color-mix(in srgb, var(--dpp-brand) 20%, transparent);
   --dpp-brandFill:var(--dsw-alias-button-primary-fill,#0f1115);
   --dpp-brandHover:var(--dsw-alias-button-primary-hover,#0a0c10);
   --dpp-brandFg:var(--dsw-alias-label-primary-foreground,#ffffff);
   --dpp-ok:var(--dsw-alias-state-success-primary,#128a4a);
-  --dpp-okLabel:var(--dsw-alias-state-success-label,#0f7b43);
-  --dpp-okSoft:var(--dsw-alias-state-success-soft,rgba(18,138,74,.1));
+  --dpp-okLabel:color-mix(in srgb, var(--dpp-ok) 70%, var(--dpp-fg));
+  --dpp-okSoft:color-mix(in srgb, var(--dpp-ok) 12%, transparent);
   --dpp-bad:var(--dsw-alias-state-error-primary,#c62828);
-  --dpp-badLabel:var(--dsw-alias-state-error-label,#b3261e);
-  --dpp-badSoft:var(--dsw-alias-state-error-soft,rgba(198,40,40,.09));
-  --dpp-warn:#a2620b;
+  --dpp-badLabel:color-mix(in srgb, var(--dpp-bad) 72%, var(--dpp-fg));
+  --dpp-badSoft:color-mix(in srgb, var(--dpp-bad) 10%, transparent);
+  --dpp-warn:color-mix(in srgb, #f59e0b 62%, var(--dpp-fg));
+  --dpp-skel:var(--dsw-alias-bg-skeleton,#eceef2);
   --dpp-overlay:rgba(12,14,18,.46);
   --dpp-shadow:0 32px 72px -24px rgba(16,20,30,.42),0 2px 10px rgba(16,20,30,.06);
   --dpp-shadowSm:0 2px 8px -2px rgba(16,20,30,.12);
@@ -138,14 +142,14 @@ export const CSS = `
 .dpp-selectValue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dpp-selectChevron{color:var(--dpp-fg3);transition:transform var(--dpp-t) var(--dpp-ease)}
 .dpp-selectTrigger.is-open .dpp-selectChevron{transform:rotate(180deg)}
-.dpp-selectPopover{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;padding:4px;border:1px solid var(--dpp-line1);border-radius:var(--dpp-r);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);animation:dppPopIn var(--dpp-t) var(--dpp-ease)}
+.dpp-selectPopover{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;padding:4px;border:1px solid var(--dpp-line);border-radius:var(--dpp-r);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);animation:dppPopIn var(--dpp-t) var(--dpp-ease)}
 .dpp-selectPopover.is-closing{animation:dppFadeOut var(--dpp-t-fast) ease-in forwards}
 .dpp-selectOption{display:flex;align-items:center;gap:6px;width:100%;height:30px;padding:0 8px;border:0;border-radius:var(--dpp-r-xs);background:transparent;color:var(--dpp-fg);font:inherit;font-size:12.5px;text-align:left;cursor:pointer;transition:background var(--dpp-t-fast)}
 .dpp-selectOption.is-active{background:var(--dpp-hover)}
 .dpp-selectCheck{display:inline-flex;align-items:center;justify-content:center;width:14px;flex:none;color:var(--dpp-brand)}
 .dpp-selectOptionLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dpp-menuWrap{position:relative}
-.dpp-menu{position:absolute;z-index:40;top:calc(100% + 4px);right:0;min-width:168px;padding:4px;border:1px solid var(--dpp-line1);border-radius:var(--dpp-r);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);animation:dppPopIn var(--dpp-t) var(--dpp-ease)}
+.dpp-menu{position:absolute;z-index:40;top:calc(100% + 4px);right:0;min-width:168px;padding:4px;border:1px solid var(--dpp-line);border-radius:var(--dpp-r);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);animation:dppPopIn var(--dpp-t) var(--dpp-ease)}
 .dpp-menu.is-closing{animation:dppFadeOut var(--dpp-t-fast) ease-in forwards}
 .dpp-menuItem{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 8px;border:0;border-radius:var(--dpp-r-xs);background:transparent;color:var(--dpp-fg);font:inherit;font-size:12.5px;text-align:left;cursor:pointer;transition:background var(--dpp-t-fast),color var(--dpp-t-fast)}
 .dpp-menuItem svg{color:var(--dpp-fg3)}
@@ -155,7 +159,7 @@ export const CSS = `
 .dpp-menuItem.is-danger.is-active{background:var(--dpp-hoverDanger)}
 
 /* ------------------------------------------------------------------- cards */
-.dpp-card{border:1px solid var(--dpp-line1);border-radius:var(--dpp-r-lg);background:var(--dpp-surface);box-shadow:0 1px 2px rgba(16,20,30,.035)}
+.dpp-card{border:1px solid var(--dpp-line);border-radius:var(--dpp-r-lg);background:var(--dpp-surface);box-shadow:0 1px 2px rgba(16,20,30,.035)}
 .dpp-cardHead{display:flex;align-items:flex-start;gap:10px;padding:16px 12px 0 18px}
 .dpp-cardHeadActions{display:flex;align-items:center;gap:4px;margin-left:auto}
 .dpp-titleBlock{flex:1;min-width:0;padding-top:1px}
@@ -210,10 +214,10 @@ export const CSS = `
 .dpp-result.is-err{background:var(--dpp-badSoft);color:var(--dpp-badLabel)}
 
 /* --------------------------------------------------------------- model list */
-.dpp-modelBox{border:1px solid var(--dpp-line1);border-radius:var(--dpp-r);overflow:hidden;background:var(--dpp-surface)}
+.dpp-modelBox{border:1px solid var(--dpp-line);border-radius:var(--dpp-r);overflow:hidden;background:var(--dpp-surface)}
 .dpp-modelRow{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 6px 0 10px;animation:dppRowIn var(--dpp-t) var(--dpp-ease) backwards;animation-delay:calc(var(--dpp-i,0) * 12ms);transition:background var(--dpp-t-fast)}
 .dpp-modelRow + .dpp-modelRow{border-top:1px solid var(--dpp-line1)}
-.dpp-modelRow:hover{background:var(--dpp-surface2)}
+.dpp-modelRow:hover{background:var(--dpp-hover)}
 .dpp-modelName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0;border:0;background:none;color:var(--dpp-fg);font-size:12.5px;letter-spacing:0;text-align:left;cursor:pointer;transition:color var(--dpp-t)}
 .dpp-modelName:hover:not(:disabled){color:var(--dpp-brand)}
 .dpp-modelName:disabled{cursor:default}
@@ -246,7 +250,7 @@ export const CSS = `
 /* ------------------------------------------------------------------ picker */
 .dpp-pickList{flex:1;min-height:0;overflow:auto;padding:0 8px 8px;scrollbar-width:thin}
 .dpp-pickRow{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:var(--dpp-r-sm);cursor:pointer;transition:background var(--dpp-t-fast)}
-.dpp-pickRow:hover{background:var(--dpp-surface2)}
+.dpp-pickRow:hover{background:var(--dpp-hover)}
 .dpp-pickRow.is-selected{background:var(--dpp-brandSoft)}
 .dpp-checkbox{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:none;border:1.5px solid var(--dpp-line2);border-radius:4.5px;background:var(--dpp-surface);color:#fff;transition:background var(--dpp-t),border-color var(--dpp-t)}
 .dpp-pickRow:hover .dpp-checkbox{border-color:var(--dpp-fg4)}
@@ -263,7 +267,7 @@ export const CSS = `
 .dpp-tplGroupTitle{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-size:12px;font-weight:600;color:var(--dpp-fg2)}
 .dpp-tplCount{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:5px;background:var(--dpp-fill);color:var(--dpp-fg4);font-size:10.5px;font-weight:500}
 .dpp-tplGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:6px}
-.dpp-tplCard{display:flex;align-items:center;gap:10px;min-height:54px;padding:8px 10px;border:1px solid var(--dpp-line1);border-radius:var(--dpp-r);background:var(--dpp-surface);color:var(--dpp-fg);font:inherit;text-align:left;cursor:pointer;animation:dppRowIn var(--dpp-t) var(--dpp-ease) backwards;transition:border-color var(--dpp-t),box-shadow var(--dpp-t),transform var(--dpp-t)}
+.dpp-tplCard{display:flex;align-items:center;gap:10px;min-height:54px;padding:8px 10px;border:1px solid var(--dpp-line);border-radius:var(--dpp-r);background:var(--dpp-surface);color:var(--dpp-fg);font:inherit;text-align:left;cursor:pointer;animation:dppRowIn var(--dpp-t) var(--dpp-ease) backwards;transition:border-color var(--dpp-t),box-shadow var(--dpp-t),transform var(--dpp-t)}
 .dpp-tplCard:hover{border-color:var(--dpp-line2);box-shadow:var(--dpp-shadowSm);transform:translateY(-1px)}
 .dpp-tplCard:active{transform:translateY(0) scale(.995)}
 .dpp-tplCard:focus-visible{outline:2px solid var(--dpp-brand);outline-offset:1px}
@@ -288,13 +292,13 @@ export const CSS = `
 /* --------------------------------------------------------------- skeletons */
 .dpp-skelRow{display:flex;align-items:center;gap:10px;height:44px;padding:0 8px}
 .dpp-skelStack{display:flex;flex-direction:column;gap:8px;width:100%}
-.dpp-skel{display:block;height:11px;border-radius:5px;background:linear-gradient(90deg,var(--dpp-fill) 25%,var(--dpp-surface2) 37%,var(--dpp-fill) 63%);background-size:400% 100%;animation:dppShimmer 1.4s ease infinite}
+.dpp-skel{display:block;height:11px;border-radius:5px;background:linear-gradient(90deg,var(--dpp-skel) 25%,var(--dpp-fill) 37%,var(--dpp-skel) 63%);background-size:400% 100%;animation:dppShimmer 1.4s ease infinite}
 .dpp-skelMark{width:22px;height:22px;border-radius:6px;flex:none}
 
 /* ------------------------------------------------------------------ modals */
 .dpp-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--dpp-overlay);backdrop-filter:blur(3px);animation:dppFadeIn var(--dpp-t) var(--dpp-ease)}
 .dpp-overlay.is-closing{animation:dppFadeOut var(--dpp-t-fast) ease-in forwards}
-.dpp-modal{display:flex;flex-direction:column;width:min(520px,100%);max-height:calc(100vh - 96px);border:1px solid var(--dpp-line1);border-radius:var(--dpp-r-lg);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);outline:0;animation:dppModalIn var(--dpp-t-slow) var(--dpp-ease)}
+.dpp-modal{display:flex;flex-direction:column;width:min(520px,100%);max-height:calc(100vh - 96px);border:1px solid var(--dpp-line);border-radius:var(--dpp-r-lg);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);outline:0;animation:dppModalIn var(--dpp-t-slow) var(--dpp-ease)}
 .dpp-modal.is-closing{animation:dppModalOut var(--dpp-t-fast) ease-in forwards}
 .dpp-modalHead{display:flex;align-items:center;gap:8px;padding:14px 12px 8px 18px}
 .dpp-modalIcon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:none;border-radius:7px;background:var(--dpp-fill);color:var(--dpp-fg3)}
@@ -316,8 +320,8 @@ export const CSS = `
 .dpp-toasts{position:fixed;right:20px;bottom:20px;z-index:90;display:flex;flex-direction:column;gap:8px;max-width:min(340px,calc(100vw - 40px));pointer-events:none}
 .dpp-toast{display:flex;align-items:flex-start;gap:9px;padding:10px 8px 10px 12px;border:1px solid var(--dpp-line1);border-radius:var(--dpp-r-lg);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);pointer-events:auto;animation:dppToastIn var(--dpp-t-slow) var(--dpp-ease)}
 .dpp-toastIcon{margin-top:1px}
-.dpp-toast.is-ok .dpp-toastIcon{color:var(--dpp-ok)}
-.dpp-toast.is-err .dpp-toastIcon{color:var(--dpp-bad)}
+.dpp-toast.is-ok .dpp-toastIcon{color:var(--dpp-okLabel)}
+.dpp-toast.is-err .dpp-toastIcon{color:var(--dpp-badLabel)}
 .dpp-toastBody{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
 .dpp-toastText{font-size:12.5px;font-weight:500;line-height:1.45}
 .dpp-toastDetail{font-size:11.5px;line-height:1.5;color:var(--dpp-fg3);word-break:break-word}
