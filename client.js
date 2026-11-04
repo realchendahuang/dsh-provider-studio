@@ -2915,7 +2915,7 @@ window.__ModuleLoader__.load({
     function Spinner({ size = 14 }) {
       return /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "loader", size, className: "dpp-spin" });
     }
-    function Modal({ open, onClose, title, label, className, bodyClassName, children, footer }) {
+    function Modal({ open, onClose, title, label, className, bodyClassName, children, footer, showClose = true, icon, iconTone }) {
       const { mounted, closing } = usePresence(open, 140);
       const panelRef = import_react2.default.useRef(null);
       import_react2.default.useEffect(() => {
@@ -2956,7 +2956,7 @@ window.__ModuleLoader__.load({
               onClose();
             }
           },
-          /* @__PURE__ */ import_react2.default.createElement("header", { className: "dpp-modalHead" }, /* @__PURE__ */ import_react2.default.createElement("h3", { className: "dpp-modalTitle" }, title), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-iconBtn", "aria-label": "\u5173\u95ED", onClick: onClose }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "x", size: 15 }))),
+          /* @__PURE__ */ import_react2.default.createElement("header", { className: "dpp-modalHead" }, icon ? /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-modalIcon${iconTone === "danger" ? " is-danger" : ""}`, "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: icon, size: 15 })) : null, /* @__PURE__ */ import_react2.default.createElement("h3", { className: "dpp-modalTitle" }, title), showClose ? /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-iconBtn", "aria-label": "\u5173\u95ED", onClick: onClose }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "x", size: 15 })) : null),
           /* @__PURE__ */ import_react2.default.createElement("div", { className: bodyClassName ? `dpp-modalBody ${bodyClassName}` : "dpp-modalBody" }, children),
           footer ? /* @__PURE__ */ import_react2.default.createElement("footer", { className: "dpp-modalFoot" }, footer) : null
         )
@@ -2987,7 +2987,10 @@ window.__ModuleLoader__.load({
           },
           title: ask.title,
           className: "dpp-modalConfirm",
-          footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: onClose, disabled: busy }, ask.cancelLabel || "\u53D6\u6D88"), /* @__PURE__ */ import_react2.default.createElement(
+          showClose: false,
+          icon: "circle-alert",
+          iconTone: ask.danger ? "danger" : "plain",
+          footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: onClose, disabled: busy }, ask.cancelLabel || "\u53D6\u6D88"), /* @__PURE__ */ import_react2.default.createElement(
             "button",
             {
               type: "button",
@@ -4359,8 +4362,8 @@ window.__ModuleLoader__.load({
       --dpp-badLabel:var(--dsw-alias-state-error-label,#b3261e);
       --dpp-badSoft:var(--dsw-alias-state-error-soft,rgba(198,40,40,.09));
       --dpp-warn:#a2620b;
-      --dpp-overlay:rgba(12,14,18,.38);
-      --dpp-shadow:0 24px 56px -20px rgba(16,20,30,.34),0 2px 8px rgba(16,20,30,.06);
+      --dpp-overlay:rgba(12,14,18,.46);
+      --dpp-shadow:0 32px 72px -24px rgba(16,20,30,.42),0 2px 10px rgba(16,20,30,.06);
       --dpp-shadowSm:0 2px 8px -2px rgba(16,20,30,.12);
       --dpp-r-lg:12px;--dpp-r:10px;--dpp-r-sm:8px;--dpp-r-xs:6px;
       --dpp-ease:cubic-bezier(.16,1,.3,1);
@@ -4616,17 +4619,23 @@ window.__ModuleLoader__.load({
     .dpp-skelMark{width:22px;height:22px;border-radius:6px;flex:none}
 
     /* ------------------------------------------------------------------ modals */
-    .dpp-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--dpp-overlay);backdrop-filter:blur(2px);animation:dppFadeIn var(--dpp-t) var(--dpp-ease)}
+    .dpp-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--dpp-overlay);backdrop-filter:blur(3px);animation:dppFadeIn var(--dpp-t) var(--dpp-ease)}
     .dpp-overlay.is-closing{animation:dppFadeOut var(--dpp-t-fast) ease-in forwards}
     .dpp-modal{display:flex;flex-direction:column;width:min(520px,100%);max-height:calc(100vh - 96px);border:1px solid var(--dpp-line1);border-radius:var(--dpp-r-lg);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);outline:0;animation:dppModalIn var(--dpp-t-slow) var(--dpp-ease)}
     .dpp-modal.is-closing{animation:dppModalOut var(--dpp-t-fast) ease-in forwards}
     .dpp-modalHead{display:flex;align-items:center;gap:8px;padding:14px 12px 8px 18px}
+    .dpp-modalIcon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:none;border-radius:7px;background:var(--dpp-fill);color:var(--dpp-fg3)}
+    .dpp-modalIcon.is-danger{background:var(--dpp-badSoft);color:var(--dpp-bad)}
     .dpp-modalTitle{flex:1;margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
     .dpp-modalBody{padding:2px 18px 18px;overflow:auto;scrollbar-width:thin}
     .dpp-modalBodyFlush{display:flex;flex-direction:column;flex:1;min-height:0;padding:6px 0 0;overflow:hidden}
-    .dpp-modalFoot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--dpp-line1)}
+    .dpp-modalFoot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--dpp-line1);background:var(--dpp-surface2);border-radius:0 0 var(--dpp-r-lg) var(--dpp-r-lg)}
     .dpp-footGap{flex:1}
     .dpp-modalConfirm{width:min(420px,100%)}
+    .dpp-modalConfirm .dpp-modalHead{padding-top:16px}
+    .dpp-modalConfirm .dpp-modalTitle{font-size:15px}
+    .dpp-modalConfirm .dpp-modalBody{padding:4px 20px 16px}
+    .dpp-modalConfirm .dpp-confirmText{font-size:13px;line-height:1.65}
     .dpp-confirmText{margin:0;font-size:12.5px;line-height:1.65;color:var(--dpp-fg2)}
     .dpp-modalPick{width:min(560px,100%);height:min(600px,calc(100vh - 96px))}
 
@@ -4676,7 +4685,7 @@ window.__ModuleLoader__.load({
       saved: "\u5DF2\u4FDD\u5B58",
       cancel: "\u53D6\u6D88",
       delete: "\u5220\u9664",
-      confirmDelete: "\u786E\u5B9A\u5220\u9664\u8FD9\u4E2A\u4F9B\u5E94\u5546\uFF1F\u5B83\u7684\u6A21\u578B\u914D\u7F6E\u4F1A\u4E00\u5E76\u4ECE llm-pi-ai \u79FB\u9664\uFF0C\u5BC6\u94A5\u4ECD\u4FDD\u7559\u5728\u51ED\u636E\u5E93\u3002",
+      confirmDelete: "\u6A21\u578B\u914D\u7F6E\u4F1A\u4ECE llm-pi-ai \u79FB\u9664\uFF0C\u5BC6\u94A5\u4ECD\u4FDD\u7559\u5728\u51ED\u636E\u5E93\u3002",
       displayName: "\u663E\u793A\u540D\u79F0",
       protocol: "\u534F\u8BAE",
       baseURL: "Base URL",

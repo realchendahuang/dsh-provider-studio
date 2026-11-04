@@ -240,7 +240,7 @@ function Spinner({ size = 14 }) {
 
 /** Minimal dialog: focus lands inside, Escape and the scrim close it, and the
  *  panel keeps its exit animation via usePresence. */
-function Modal({ open, onClose, title, label, className, bodyClassName, children, footer }) {
+function Modal({ open, onClose, title, label, className, bodyClassName, children, footer, showClose = true, icon, iconTone }) {
   const { mounted, closing } = usePresence(open, 140)
   const panelRef = React.useRef(null)
 
@@ -283,10 +283,17 @@ function Modal({ open, onClose, title, label, className, bodyClassName, children
         }}
       >
         <header className="dpp-modalHead">
+          {icon ? (
+            <span className={`dpp-modalIcon${iconTone === 'danger' ? ' is-danger' : ''}`} aria-hidden="true">
+              <Icon name={icon} size={15} />
+            </span>
+          ) : null}
           <h3 className="dpp-modalTitle">{title}</h3>
-          <button type="button" className="dpp-iconBtn" aria-label="关闭" onClick={onClose}>
-            <Icon name="x" size={15} />
-          </button>
+          {showClose ? (
+            <button type="button" className="dpp-iconBtn" aria-label="关闭" onClick={onClose}>
+              <Icon name="x" size={15} />
+            </button>
+          ) : null}
         </header>
         <div className={bodyClassName ? `dpp-modalBody ${bodyClassName}` : 'dpp-modalBody'}>
           {children}
@@ -324,9 +331,12 @@ function ConfirmDialog({ ask, onClose }) {
       onClose={() => { if (!busy) onClose() }}
       title={ask.title}
       className="dpp-modalConfirm"
+      showClose={false}
+      icon="circle-alert"
+      iconTone={ask.danger ? 'danger' : 'plain'}
       footer={(
         <>
-          <button type="button" className="dpp-btn dpp-btnGhost" onClick={onClose} disabled={busy}>
+          <button type="button" className="dpp-btn" onClick={onClose} disabled={busy}>
             {ask.cancelLabel || '取消'}
           </button>
           <button

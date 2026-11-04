@@ -23,7 +23,7 @@ export const ZH = {
   saved: '已保存',
   cancel: '取消',
   delete: '删除',
-  confirmDelete: '确定删除这个供应商？它的模型配置会一并从 llm-pi-ai 移除，密钥仍保留在凭据库。',
+  confirmDelete: '模型配置会从 llm-pi-ai 移除，密钥仍保留在凭据库。',
   displayName: '显示名称',
   protocol: '协议',
   baseURL: 'Base URL',
