@@ -35,6 +35,111 @@ const DEEPSEEK_DEFAULT_REF = 'DEEPSEEK_API_KEY'
 const PROTOCOLS = ['openai-completions', 'openai-responses', 'anthropic-messages']
 
 // ---------------------------------------------------------------------------
+// vocabulary shared with the pi-ai schema
+// ---------------------------------------------------------------------------
+
+/** Thinking levels the adapter accepts, in escalation order. */
+const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+const TRANSPORTS = ['auto', 'sse', 'websocket', 'websocket-cached']
+const CACHE_RETENTIONS = ['none', 'short', 'long']
+const MODALITIES = ['text', 'image']
+const THINKING_BUDGETS = ['minimal', 'low', 'medium', 'high']
+
+/** Enum-valued compat switches and the spellings each accepts. */
+const COMPAT_ENUM = {
+  maxTokensField: ['max_completion_tokens', 'max_tokens'],
+  thinkingFormat: [
+    'openai', 'deepseek', 'openrouter', 'together', 'baseten', 'zai', 'qwen',
+    'chat-template', 'qwen-chat-template', 'string-thinking', 'ant-ling',
+  ],
+  thinkingTokenBudgetField: ['thinking_token_budget', 'thinking_budget', 'thinking_budget_tokens'],
+  cacheControlFormat: ['anthropic'],
+}
+const COMPAT_NUMBER = ['vllmPriority']
+const COMPAT_JSON = ['chatTemplateKwargs', 'chatTemplateArgs']
+
+/** The switches each wire protocol offers (pi-ai's own gate). */
+const COMPAT_BY_PROTOCOL = {
+  'openai-completions': [
+    'supportsStore', 'supportsDeveloperRole', 'supportsReasoningEffort',
+    'supportsUsageInStreaming', 'supportsFinishReason', 'maxTokensField',
+    'requiresToolResultName', 'requiresAssistantAfterToolResult', 'requiresThinkingAsText',
+    'requiresReasoningContentOnAssistantMessages', 'thinkingFormat', 'chatTemplateKwargs',
+    'chatTemplateArgs', 'supportsThinkingTokenBudget', 'thinkingTokenBudgetField',
+    'vllmPriority', 'supportsStrictMode', 'cacheControlFormat', 'supportsLongCacheRetention',
+  ],
+  'openai-responses': [
+    'supportsDeveloperRole', 'supportsMaxOutputTokens', 'supportsStrictMode',
+    'supportsLongCacheRetention',
+  ],
+  'anthropic-messages': [
+    'supportsEagerToolInputStreaming', 'supportsLongCacheRetention', 'supportsCacheControlOnTools',
+    'supportsTemperature', 'forceAdaptiveThinking', 'allowEmptySignature', 'supportsStrictTools',
+  ],
+}
+
+/** llm-deepseek's own route knobs: a different vocabulary from pi-ai, so the
+ *  panel keeps a separate patch shape for the built-in route. */
+const DEEPSEEK_THINKING = ['enabled', 'disabled']
+const DEEPSEEK_EFFORTS = ['off', 'low', 'high', 'max']
+
+function applyDeepseekAdvanced(next, patch) {
+  if (patch === null || patch === undefined || typeof patch !== 'object') return next
+  const setEnum = (key, allowed, label) => {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) return
+    const value = patch[key]
+    if (value === null || value === undefined) {
+      delete next[key]
+      return
+    }
+    const spelling = text(value)
+    if (!allowed.includes(spelling)) throw new Error(`${label} 只能是 ${allowed.join(' / ')}`)
+    next[key] = spelling
+  }
+  setEnum('thinking', DEEPSEEK_THINKING, '思考模式')
+  setEnum('reasoningEffort', DEEPSEEK_EFFORTS, '推理等级')
+  for (const key of ['maxTokens', 'defaultContextWindow', 'streamIdleTimeoutMs']) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) continue
+    const value = patch[key]
+    if (value === null || value === undefined) {
+      delete next[key]
+      continue
+    }
+    next[key] = wholeNumber(value, key)
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'retryPolicy')) {
+    const value = patch.retryPolicy
+    if (value === null || value === undefined) {
+      delete next.retryPolicy
+    } else {
+      const mode = text(value && value.mode)
+      if (mode !== 'normal' && mode !== 'always') throw new Error('重试策略需要 mode: normal 或 always')
+      const existing = next.retryPolicy !== null && typeof next.retryPolicy === 'object' ? next.retryPolicy : {}
+      const policy = { ...existing, mode }
+      if (mode === 'normal') {
+        if (value.maxRetries !== null && value.maxRetries !== undefined) {
+          policy.maxRetries = wholeNumber(value.maxRetries, '最大重试次数', { allowZero: true })
+        }
+      } else {
+        delete policy.maxRetries
+        delete policy.retryableCodes
+      }
+      next.retryPolicy = policy
+    }
+  }
+  return next
+}
+
+/** Route-level fields the advanced editor owns; every other key in a stored
+ *  profile is left exactly as the user wrote it. */
+const ADVANCED_KEYS = [
+  'headers', 'compat', 'reasoning', 'defaultContextWindow', 'defaultMaxTokens', 'defaultInput',
+  'transport', 'cacheRetention', 'timeoutMs', 'websocketConnectTimeoutMs', 'streamIdleTimeoutMs',
+  'maxRequestImageBytes', 'requestImagePixelBudget', 'requestImageMaxBytes', 'retryPolicy',
+  'thinkingBudgets',
+]
+
+// ---------------------------------------------------------------------------
 // plugin entry
 // ---------------------------------------------------------------------------
 
@@ -65,6 +170,170 @@ function makeHostPlain(value) {
     return out
   }
   return value
+}
+
+// ---------------------------------------------------------------------------
+// pi-ai field sanitizers (the panel must never write a profile pi-ai refuses)
+// ---------------------------------------------------------------------------
+
+function wholeNumber(value, label, { allowZero = false } = {}) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+    throw new Error(`${label} 需要整数`)
+  }
+  if (parsed < (allowZero ? 0 : 1)) throw new Error(`${label} 需要正数`)
+  return parsed
+}
+
+/** `false`, an ordered level→wire map, or undefined for "inherit the catalog". */
+function sanitizeReasoningEfforts(value) {
+  if (value === false) return false
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('reasoningEfforts 必须是对象或 false')
+  }
+  const out = {}
+  for (const [level, wire] of Object.entries(value)) {
+    if (!THINKING_LEVELS.includes(level)) throw new Error(`未知的思考等级：${level}`)
+    const spelling = text(wire).trim()
+    if (spelling === '') {
+      if (level !== 'off') throw new Error(`思考等级 ${level} 需要发送值`)
+      out[level] = null
+      continue
+    }
+    out[level] = spelling
+  }
+  if (Object.keys(out).length === 0) throw new Error('reasoningEfforts 不能为空')
+  if (!Object.keys(out).some((level) => level !== 'off')) {
+    throw new Error('reasoningEfforts 至少要有一个 off 以外的等级')
+  }
+  return out
+}
+
+/** One protocol's compat switches; `filter` drops what the protocol refuses
+ *  instead of throwing, which is what a protocol change needs. */
+function sanitizeCompat(value, api, { filter = false } = {}) {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('compat 必须是对象')
+  const offered = new Set(COMPAT_BY_PROTOCOL[api] || [])
+  const out = {}
+  for (const [field, raw] of Object.entries(value)) {
+    if (!offered.has(field)) {
+      if (filter) continue
+      throw new Error(`协议 ${api || '（未设置）'} 不支持兼容开关：${field}`)
+    }
+    if (Array.isArray(COMPAT_ENUM[field])) {
+      const spelling = text(raw)
+      if (!COMPAT_ENUM[field].includes(spelling)) throw new Error(`兼容开关 ${field} 的取值无效：${spelling}`)
+      out[field] = spelling
+    } else if (COMPAT_NUMBER.includes(field)) {
+      out[field] = wholeNumber(raw, `兼容开关 ${field}`, { allowZero: true })
+    } else if (COMPAT_JSON.includes(field)) {
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error(`兼容开关 ${field} 需要一个对象`)
+      }
+      out[field] = raw
+    } else {
+      if (typeof raw !== 'boolean') throw new Error(`兼容开关 ${field} 需要布尔值`)
+      out[field] = raw
+    }
+  }
+  return Object.keys(out).length === 0 ? undefined : out
+}
+
+/** Merge the advanced editor's patch into a profile in place. `null` removes a
+ *  field; keys the patch does not mention keep whatever the document held. */
+function applyAdvanced(next, patch) {
+  if (patch === null || patch === undefined || typeof patch !== 'object') return next
+  const api = text(next.api)
+  for (const key of ADVANCED_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) continue
+    const value = patch[key]
+    if (value === null || value === undefined) {
+      delete next[key]
+      continue
+    }
+    if (key === 'headers') {
+      if (typeof value !== 'object' || Array.isArray(value)) throw new Error('请求头必须是对象')
+      const headers = {}
+      for (const [name, raw] of Object.entries(value)) {
+        const header = text(name).trim()
+        if (header === '') continue
+        headers[header] = text(raw)
+      }
+      if (Object.keys(headers).length === 0) delete next.headers
+      else next.headers = headers
+      continue
+    }
+    if (key === 'compat') {
+      const compat = sanitizeCompat(value, api, { filter: true })
+      if (compat === undefined) delete next.compat
+      else next.compat = compat
+      continue
+    }
+    if (key === 'reasoning') {
+      const level = text(value)
+      if (!THINKING_LEVELS.includes(level)) throw new Error(`未知的思考等级：${level}`)
+      next.reasoning = level
+      continue
+    }
+    if (key === 'defaultInput') {
+      if (!Array.isArray(value)) throw new Error('缺省输入模态必须是数组')
+      const modalities = value.map((item) => text(item)).filter((item) => MODALITIES.includes(item))
+      if (modalities.length === 0) delete next.defaultInput
+      else next.defaultInput = modalities
+      continue
+    }
+    if (key === 'transport') {
+      const transport = text(value)
+      if (!TRANSPORTS.includes(transport)) throw new Error(`不支持的传输方式：${transport}`)
+      next.transport = transport
+      continue
+    }
+    if (key === 'cacheRetention') {
+      const retention = text(value)
+      if (!CACHE_RETENTIONS.includes(retention)) throw new Error(`不支持的缓存保留策略：${retention}`)
+      next.cacheRetention = retention
+      continue
+    }
+    if (key === 'retryPolicy') {
+      const mode = text(value && value.mode)
+      if (mode !== 'normal' && mode !== 'always') throw new Error('重试策略需要 mode: normal 或 always')
+      const existing = next.retryPolicy !== null && typeof next.retryPolicy === 'object'
+        ? next.retryPolicy
+        : {}
+      const policy = { ...existing, mode }
+      if (mode === 'normal') {
+        if (value.maxRetries !== null && value.maxRetries !== undefined) {
+          policy.maxRetries = wholeNumber(value.maxRetries, '最大重试次数', { allowZero: true })
+        }
+      } else {
+        delete policy.maxRetries
+        delete policy.retryableCodes
+      }
+      next.retryPolicy = policy
+      continue
+    }
+    if (key === 'thinkingBudgets') {
+      if (typeof value !== 'object' || Array.isArray(value)) throw new Error('思考预算必须是对象')
+      const budgets = {}
+      for (const level of THINKING_BUDGETS) {
+        if (value[level] === null || value[level] === undefined) continue
+        budgets[level] = wholeNumber(value[level], `思考预算 ${level}`)
+      }
+      if (Object.keys(budgets).length === 0) delete next.thinkingBudgets
+      else next.thinkingBudgets = budgets
+      continue
+    }
+    next[key] = wholeNumber(value, key)
+  }
+  // A protocol change must not leave switches the new protocol refuses behind.
+  if (next.compat !== undefined) {
+    const compat = sanitizeCompat(next.compat, api, { filter: true })
+    if (compat === undefined) delete next.compat
+    else next.compat = compat
+  }
+  return next
 }
 
 function matchNamespace(ns, target) {
@@ -308,6 +577,23 @@ function normalizeModels(models) {
     })
 }
 
+/** Fields only a pi-ai model entry carries; the DeepSeek catalog has its own
+ *  schema and must not grow these keys. */
+function cleanPiModel(draft, api) {
+  const model = cleanModel(draft)
+  if (Object.prototype.hasOwnProperty.call(model, 'reasoningEfforts')) {
+    const efforts = sanitizeReasoningEfforts(model.reasoningEfforts)
+    if (efforts === undefined) delete model.reasoningEfforts
+    else model.reasoningEfforts = efforts
+  }
+  if (Object.prototype.hasOwnProperty.call(model, 'compat')) {
+    const compat = sanitizeCompat(model.compat, api, { filter: true })
+    if (compat === undefined) delete model.compat
+    else model.compat = compat
+  }
+  return model
+}
+
 /** Keep everything the editor does not own, coerce the fields it does. */
 function cleanModel(draft) {
   const source = draft !== null && typeof draft === 'object' ? draft : {}
@@ -404,11 +690,13 @@ function deepseekView(config, info, secret) {
     hasBaseURL: true,
     headers: {},
     secret: secret === null ? null : { value: secret },
-    extra: {
-      thinking: config.thinking,
-      reasoningEffort: config.reasoningEffort,
+    advanced: {
+      thinking: text(config.thinking),
+      reasoningEffort: text(config.reasoningEffort),
       maxTokens: config.maxTokens,
       defaultContextWindow: config.defaultContextWindow,
+      streamIdleTimeoutMs: config.streamIdleTimeoutMs,
+      retryPolicy: config.retryPolicy !== null && typeof config.retryPolicy === 'object' ? config.retryPolicy : undefined,
     },
   }
 }
@@ -537,7 +825,7 @@ class ProviderPanelRuntime extends TypertRemoteService {
       keySource: info.source ?? null,
       keyHint: info.hint ?? null,
       secret: secret === null ? null : { value: secret },
-      extra: omitKnown(profile),
+      advanced: omitKnown(profile),
     }
   }
 
@@ -560,10 +848,15 @@ class ProviderPanelRuntime extends TypertRemoteService {
     }
     if (Array.isArray(patch.models)) {
       try {
-        next.models = patch.models.map(cleanModel)
+        next.models = patch.models.map((draft) => cleanPiModel(draft, text(next.api)))
       } catch (err) {
         return { ok: false, error: String(err && err.message ? err.message : err) }
       }
+    }
+    try {
+      applyAdvanced(next, patch.advanced)
+    } catch (err) {
+      return { ok: false, error: String(err && err.message ? err.message : err) }
     }
 
     const apiKey = typeof (args && args.apiKey) === 'string' ? args.apiKey : undefined
@@ -611,6 +904,12 @@ class ProviderPanelRuntime extends TypertRemoteService {
       } catch (err) {
         return { ok: false, error: String(err && err.message ? err.message : err) }
       }
+    }
+
+    try {
+      applyDeepseekAdvanced(next, patch.advanced)
+    } catch (err) {
+      return { ok: false, error: String(err && err.message ? err.message : err) }
     }
 
     const apiKey = typeof (args && args.apiKey) === 'string' ? args.apiKey : undefined
@@ -864,7 +1163,7 @@ class ProviderPanelRuntime extends TypertRemoteService {
 
 /** Every provider field the panel knows about; everything else is echoed back. */
 function omitKnown(profile) {
-  const known = new Set(['displayName', 'api', 'baseURL', 'apiKeyEnv', 'headers', 'models'])
+  const known = new Set(['displayName', 'api', 'baseURL', 'apiKeyEnv', 'models'])
   const rest = {}
   for (const [key, value] of Object.entries(profile)) {
     if (!known.has(key)) rest[key] = value

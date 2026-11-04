@@ -2776,6 +2776,352 @@ window.__ModuleLoader__.load({
       );
     }
 
+    // src/client/fields.js
+    var THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+    var LEVEL_KEYS = {
+      off: "levelOff",
+      minimal: "levelMinimal",
+      low: "levelLow",
+      medium: "levelMedium",
+      high: "levelHigh",
+      xhigh: "levelXhigh",
+      max: "levelMax"
+    };
+    function levelKey(level) {
+      return LEVEL_KEYS[level] || level;
+    }
+    function levelLabel(t, level) {
+      return `${t(levelKey(level))} \xB7 ${level}`;
+    }
+    var THINKING_FORMATS = [
+      "openai",
+      "deepseek",
+      "openrouter",
+      "together",
+      "baseten",
+      "zai",
+      "qwen",
+      "chat-template",
+      "qwen-chat-template",
+      "string-thinking",
+      "ant-ling"
+    ];
+    var COMPAT_FIELDS = {
+      supportsStore: { kind: "bool", labelKey: "cfSupportsStore" },
+      supportsDeveloperRole: { kind: "bool", labelKey: "cfSupportsDeveloperRole" },
+      supportsReasoningEffort: { kind: "bool", labelKey: "cfSupportsReasoningEffort" },
+      supportsUsageInStreaming: { kind: "bool", labelKey: "cfSupportsUsageInStreaming" },
+      supportsFinishReason: { kind: "bool", labelKey: "cfSupportsFinishReason" },
+      maxTokensField: {
+        kind: "enum",
+        options: ["max_completion_tokens", "max_tokens"],
+        labelKey: "cfMaxTokensField"
+      },
+      requiresToolResultName: { kind: "bool", labelKey: "cfRequiresToolResultName" },
+      requiresAssistantAfterToolResult: { kind: "bool", labelKey: "cfRequiresAssistantAfterToolResult" },
+      requiresThinkingAsText: { kind: "bool", labelKey: "cfRequiresThinkingAsText" },
+      requiresReasoningContentOnAssistantMessages: {
+        kind: "bool",
+        labelKey: "cfRequiresReasoningContent"
+      },
+      thinkingFormat: { kind: "enum", options: THINKING_FORMATS, labelKey: "cfThinkingFormat" },
+      chatTemplateKwargs: { kind: "json", labelKey: "cfChatTemplateKwargs" },
+      chatTemplateArgs: { kind: "json", labelKey: "cfChatTemplateArgs" },
+      supportsThinkingTokenBudget: { kind: "bool", labelKey: "cfSupportsThinkingTokenBudget" },
+      thinkingTokenBudgetField: {
+        kind: "enum",
+        options: ["thinking_token_budget", "thinking_budget", "thinking_budget_tokens"],
+        labelKey: "cfThinkingTokenBudgetField"
+      },
+      vllmPriority: { kind: "number", labelKey: "cfVllmPriority" },
+      supportsStrictMode: { kind: "bool", labelKey: "cfSupportsStrictMode" },
+      cacheControlFormat: { kind: "enum", options: ["anthropic"], labelKey: "cfCacheControlFormat" },
+      supportsLongCacheRetention: { kind: "bool", labelKey: "cfSupportsLongCacheRetention" },
+      supportsMaxOutputTokens: { kind: "bool", labelKey: "cfSupportsMaxOutputTokens" },
+      supportsEagerToolInputStreaming: {
+        kind: "bool",
+        labelKey: "cfSupportsEagerToolInputStreaming"
+      },
+      supportsCacheControlOnTools: { kind: "bool", labelKey: "cfSupportsCacheControlOnTools" },
+      supportsTemperature: { kind: "bool", labelKey: "cfSupportsTemperature" },
+      forceAdaptiveThinking: { kind: "bool", labelKey: "cfForceAdaptiveThinking" },
+      allowEmptySignature: { kind: "bool", labelKey: "cfAllowEmptySignature" },
+      supportsStrictTools: { kind: "bool", labelKey: "cfSupportsStrictTools" }
+    };
+    var COMPAT_BY_PROTOCOL = {
+      "openai-completions": [
+        "supportsStore",
+        "supportsDeveloperRole",
+        "supportsReasoningEffort",
+        "supportsUsageInStreaming",
+        "supportsFinishReason",
+        "maxTokensField",
+        "requiresToolResultName",
+        "requiresAssistantAfterToolResult",
+        "requiresThinkingAsText",
+        "requiresReasoningContentOnAssistantMessages",
+        "thinkingFormat",
+        "chatTemplateKwargs",
+        "chatTemplateArgs",
+        "supportsThinkingTokenBudget",
+        "thinkingTokenBudgetField",
+        "vllmPriority",
+        "supportsStrictMode",
+        "cacheControlFormat",
+        "supportsLongCacheRetention"
+      ],
+      "openai-responses": [
+        "supportsDeveloperRole",
+        "supportsMaxOutputTokens",
+        "supportsStrictMode",
+        "supportsLongCacheRetention"
+      ],
+      "anthropic-messages": [
+        "supportsEagerToolInputStreaming",
+        "supportsLongCacheRetention",
+        "supportsCacheControlOnTools",
+        "supportsTemperature",
+        "forceAdaptiveThinking",
+        "allowEmptySignature",
+        "supportsStrictTools"
+      ]
+    };
+    function compatFieldsFor(api) {
+      const keys = COMPAT_BY_PROTOCOL[api] || [];
+      return keys.map((key) => ({ key, ...COMPAT_FIELDS[key] }));
+    }
+    function readReasoning(model) {
+      const value = model !== null && typeof model === "object" ? model.reasoningEfforts : void 0;
+      if (value === false) return { mode: "none", rows: [] };
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        const rows = Object.entries(value).filter(([level]) => THINKING_LEVELS.includes(level)).map(([level, wire]) => [level, typeof wire === "string" ? wire : ""]);
+        if (rows.length === 0) return { mode: "inherit", rows: [] };
+        return { mode: "custom", rows };
+      }
+      return { mode: "inherit", rows: [] };
+    }
+    function initialReasoningRows() {
+      return [
+        ["off", ""],
+        ["low", "low"],
+        ["medium", "medium"],
+        ["high", "high"]
+      ];
+    }
+    function applyReasoning(model, state) {
+      const next = { ...model };
+      delete next.reasoningEfforts;
+      if (state.mode === "none") {
+        next.reasoningEfforts = false;
+        return next;
+      }
+      if (state.mode !== "custom" || state.rows.length === 0) return next;
+      const efforts = {};
+      for (const [level, wire] of state.rows) {
+        if (!THINKING_LEVELS.includes(level)) continue;
+        efforts[level] = level === "off" && wire.trim() === "" ? null : wire.trim();
+      }
+      next.reasoningEfforts = efforts;
+      return next;
+    }
+    function reasoningProblem(state) {
+      if (state.mode !== "custom") return "";
+      if (state.rows.length === 0) return "thinkingNeedsLevel";
+      if (!state.rows.some(([level]) => level !== "off")) return "thinkingNeedsLevel";
+      for (const [level, wire] of state.rows) {
+        if (level !== "off" && wire.trim() === "") return "thinkingNeedsWire";
+      }
+      return "";
+    }
+    function readCompat(compat, api) {
+      if (compat === null || typeof compat !== "object" || Array.isArray(compat)) return [];
+      const offered = new Set(COMPAT_BY_PROTOCOL[api] || []);
+      return Object.entries(compat).filter(([key]) => offered.has(key)).map(([key, value]) => [key, value]);
+    }
+    function writeCompat(rows) {
+      if (!Array.isArray(rows) || rows.length === 0) return void 0;
+      const compat = {};
+      for (const [key, value] of rows) {
+        if (!Object.prototype.hasOwnProperty.call(COMPAT_FIELDS, key)) continue;
+        if (value === void 0) continue;
+        compat[key] = value;
+      }
+      return Object.keys(compat).length === 0 ? void 0 : compat;
+    }
+    function parseJsonValue(text) {
+      const source = String(text === void 0 || text === null ? "" : text).trim();
+      if (source === "") return void 0;
+      try {
+        const parsed = JSON.parse(source);
+        return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    function formatJsonValue(value) {
+      if (value === void 0) return "";
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return "";
+      }
+    }
+    var TRANSPORTS = ["auto", "sse", "websocket", "websocket-cached"];
+    var CACHE_RETENTIONS = ["none", "short", "long"];
+    var RETRY_MODES = ["normal", "always"];
+    var MODALITIES = ["text", "image"];
+    var THINKING_BUDGET_LEVELS = ["minimal", "low", "medium", "high"];
+    function readAdvanced(profile) {
+      const source = profile !== null && typeof profile === "object" ? profile : {};
+      const headers = source.headers !== null && typeof source.headers === "object" ? Object.entries(source.headers).map(([key, value]) => [key, String(value)]) : [];
+      const retry = source.retryPolicy !== null && typeof source.retryPolicy === "object" ? source.retryPolicy : {};
+      const budgets = source.thinkingBudgets !== null && typeof source.thinkingBudgets === "object" ? source.thinkingBudgets : {};
+      return {
+        headers,
+        compat: readCompat(source.compat, source.api),
+        reasoning: typeof source.reasoning === "string" ? source.reasoning : "",
+        defaultContextWindow: numberText(source.defaultContextWindow),
+        defaultMaxTokens: numberText(source.defaultMaxTokens),
+        defaultInput: Array.isArray(source.defaultInput) ? source.defaultInput : [],
+        transport: typeof source.transport === "string" ? source.transport : "",
+        cacheRetention: typeof source.cacheRetention === "string" ? source.cacheRetention : "",
+        timeoutMs: numberText(source.timeoutMs),
+        websocketConnectTimeoutMs: numberText(source.websocketConnectTimeoutMs),
+        streamIdleTimeoutMs: numberText(source.streamIdleTimeoutMs),
+        maxRequestImageBytes: numberText(source.maxRequestImageBytes),
+        requestImagePixelBudget: numberText(source.requestImagePixelBudget),
+        requestImageMaxBytes: numberText(source.requestImageMaxBytes),
+        retryMode: typeof retry.mode === "string" ? retry.mode : "",
+        maxRetries: numberText(retry.maxRetries),
+        thinkingBudgets: Object.fromEntries(
+          THINKING_BUDGET_LEVELS.map((level) => [level, numberText(budgets[level])])
+        )
+      };
+    }
+    function numberText(value) {
+      return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+    }
+    function advancedCount(state) {
+      if (state === void 0 || state === null) return 0;
+      let count = state.headers.length + state.compat.length;
+      if (state.reasoning !== "") count += 1;
+      if (state.transport !== "") count += 1;
+      if (state.cacheRetention !== "") count += 1;
+      if (state.retryMode !== "" || state.maxRetries !== "") count += 1;
+      if (state.defaultInput.length > 0) count += 1;
+      for (const field of [
+        "defaultContextWindow",
+        "defaultMaxTokens",
+        "timeoutMs",
+        "websocketConnectTimeoutMs",
+        "streamIdleTimeoutMs",
+        "maxRequestImageBytes",
+        "requestImagePixelBudget",
+        "requestImageMaxBytes"
+      ]) {
+        if (state[field] !== "") count += 1;
+      }
+      if (THINKING_BUDGET_LEVELS.some((level) => state.thinkingBudgets[level] !== "")) count += 1;
+      return count;
+    }
+    function buildAdvancedPatch(state) {
+      const patch = {};
+      const headers = {};
+      for (const [name2, value] of state.headers) {
+        const key = String(name2).trim();
+        if (key === "") continue;
+        headers[key] = String(value);
+      }
+      patch.headers = Object.keys(headers).length > 0 ? headers : null;
+      patch.compat = state.compat.length > 0 ? Object.fromEntries(state.compat) : null;
+      patch.reasoning = state.reasoning === "" ? null : state.reasoning;
+      patch.defaultInput = state.defaultInput.length > 0 ? state.defaultInput : null;
+      patch.transport = state.transport === "" ? null : state.transport;
+      patch.cacheRetention = state.cacheRetention === "" ? null : state.cacheRetention;
+      for (const field of [
+        "defaultContextWindow",
+        "defaultMaxTokens",
+        "timeoutMs",
+        "websocketConnectTimeoutMs",
+        "streamIdleTimeoutMs",
+        "maxRequestImageBytes",
+        "requestImagePixelBudget",
+        "requestImageMaxBytes"
+      ]) {
+        patch[field] = positiveNumber(state[field]);
+      }
+      const budgets = {};
+      for (const level of THINKING_BUDGET_LEVELS) {
+        const value = positiveNumber(state.thinkingBudgets[level]);
+        if (typeof value === "number") budgets[level] = value;
+      }
+      patch.thinkingBudgets = Object.keys(budgets).length > 0 ? budgets : null;
+      if (state.retryMode === "") {
+        patch.retryPolicy = null;
+      } else {
+        const policy = { mode: state.retryMode };
+        if (state.retryMode === "normal") {
+          const retries = positiveNumber(state.maxRetries, true);
+          if (typeof retries === "number") policy.maxRetries = retries;
+        }
+        patch.retryPolicy = policy;
+      }
+      return patch;
+    }
+    function positiveNumber(value, allowZero = false) {
+      const source = String(value === void 0 || value === null ? "" : value).trim();
+      if (source === "") return null;
+      const parsed = Number(source);
+      if (!Number.isFinite(parsed)) return null;
+      if (allowZero ? parsed < 0 : parsed <= 0) return null;
+      return Math.round(parsed);
+    }
+    var DEEPSEEK_EFFORTS = ["off", "low", "high", "max"];
+    function readDeepseekAdvanced(profile) {
+      const source = profile !== null && typeof profile === "object" ? profile : {};
+      const retry = source.retryPolicy !== null && typeof source.retryPolicy === "object" ? source.retryPolicy : {};
+      return {
+        thinking: typeof source.thinking === "string" ? source.thinking : "",
+        reasoningEffort: typeof source.reasoningEffort === "string" ? source.reasoningEffort : "",
+        maxTokens: numberText(source.maxTokens),
+        defaultContextWindow: numberText(source.defaultContextWindow),
+        streamIdleTimeoutMs: numberText(source.streamIdleTimeoutMs),
+        retryMode: typeof retry.mode === "string" ? retry.mode : "",
+        maxRetries: numberText(retry.maxRetries)
+      };
+    }
+    function deepseekCount(state) {
+      if (state === void 0 || state === null) return 0;
+      let count = 0;
+      if (state.thinking !== "") count += 1;
+      if (state.reasoningEffort !== "") count += 1;
+      if (state.maxTokens !== "") count += 1;
+      if (state.defaultContextWindow !== "") count += 1;
+      if (state.streamIdleTimeoutMs !== "") count += 1;
+      if (state.retryMode !== "" || state.maxRetries !== "") count += 1;
+      return count;
+    }
+    function buildDeepseekPatch(state) {
+      const patch = {
+        thinking: state.thinking === "" ? null : state.thinking,
+        reasoningEffort: state.reasoningEffort === "" ? null : state.reasoningEffort,
+        maxTokens: positiveNumber(state.maxTokens),
+        defaultContextWindow: positiveNumber(state.defaultContextWindow),
+        streamIdleTimeoutMs: positiveNumber(state.streamIdleTimeoutMs)
+      };
+      if (state.retryMode === "") {
+        patch.retryPolicy = null;
+      } else {
+        const policy = { mode: state.retryMode };
+        if (state.retryMode === "normal") {
+          const retries = positiveNumber(state.maxRetries, true);
+          if (typeof retries === "number") policy.maxRetries = retries;
+        }
+        patch.retryPolicy = policy;
+      }
+      return patch;
+    }
+
     // src/client/app.jsx
     var PROTO_LABELS = {
       "openai-completions": "OpenAI \u517C\u5BB9",
@@ -3090,14 +3436,31 @@ window.__ModuleLoader__.load({
         ))
       ) : null);
     }
-    function SelectMenu({ value, options, onChange, disabled, ariaLabel }) {
+    function SelectMenu({ value, options, onChange, disabled, ariaLabel, className, placeholder }) {
       const [open, setOpen] = import_react2.default.useState(false);
       const { mounted, closing } = usePresence(open, 120);
       const rootRef = import_react2.default.useRef(null);
-      const current = options.find((option) => option.value === value) || options[0];
+      const triggerRef = import_react2.default.useRef(null);
+      const [box, setBox] = import_react2.default.useState(null);
+      const matched = options.find((option) => option.value === value) || null;
+      const current = matched !== null ? matched : placeholder === void 0 ? options[0] : null;
+      const currentLabel = current !== null && current !== void 0 ? current.label : placeholder || "";
       const [active, setActive] = import_react2.default.useState(() => Math.max(0, options.findIndex((option) => option.value === value)));
+      const measure = import_react2.default.useCallback(() => {
+        const node = triggerRef.current;
+        if (node === null || typeof window === "undefined") return;
+        const rect = node.getBoundingClientRect();
+        const width = Math.min(Math.max(rect.width, 168), Math.max(160, window.innerWidth - 16));
+        const below = window.innerHeight - rect.bottom - 12;
+        const above = rect.top - 12;
+        const up = below < 168 && above > below;
+        const room = Math.min(Math.max(up ? above : below, 120), 264);
+        const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
+        setBox(up ? { left, bottom: Math.max(8, window.innerHeight - rect.top + 6), width, maxHeight: room } : { left, top: rect.bottom + 6, width, maxHeight: room });
+      }, []);
       import_react2.default.useEffect(() => {
         if (!open) return void 0;
+        measure();
         setActive(Math.max(0, options.findIndex((option) => option.value === value)));
         const onPointerDown = (event) => {
           if (rootRef.current !== null && !rootRef.current.contains(event.target)) setOpen(false);
@@ -3108,21 +3471,31 @@ window.__ModuleLoader__.load({
           event.stopPropagation();
           setOpen(false);
         };
+        const onScroll = (event) => {
+          if (rootRef.current !== null && event.target instanceof Node && rootRef.current.contains(event.target)) return;
+          setOpen(false);
+        };
+        const onResize = () => measure();
+        window.addEventListener("scroll", onScroll, true);
+        window.addEventListener("resize", onResize);
         document.addEventListener("mousedown", onPointerDown);
         document.addEventListener("keydown", onKeyDown, true);
         return () => {
+          window.removeEventListener("scroll", onScroll, true);
+          window.removeEventListener("resize", onResize);
           document.removeEventListener("mousedown", onPointerDown);
           document.removeEventListener("keydown", onKeyDown, true);
         };
-      }, [open, options, value]);
+      }, [open, options, value, measure]);
       const commit = (option) => {
         onChange(option.value);
         setOpen(false);
       };
-      return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-selectMenu", ref: rootRef }, /* @__PURE__ */ import_react2.default.createElement(
+      return /* @__PURE__ */ import_react2.default.createElement("div", { className: className ? `dpp-selectMenu ${className}` : "dpp-selectMenu", ref: rootRef }, /* @__PURE__ */ import_react2.default.createElement(
         "button",
         {
           type: "button",
+          ref: triggerRef,
           className: `dpp-selectTrigger${open ? " is-open" : ""}`,
           disabled,
           "aria-haspopup": "listbox",
@@ -3149,13 +3522,14 @@ window.__ModuleLoader__.load({
             }
           }
         },
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-selectValue" }, current ? current.label : ""),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-selectValue" }, currentLabel),
         /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "chevron-down", size: 13, className: "dpp-selectChevron" })
-      ), mounted ? /* @__PURE__ */ import_react2.default.createElement(
+      ), mounted && box !== null ? /* @__PURE__ */ import_react2.default.createElement(
         "div",
         {
           className: `dpp-selectPopover${closing ? " is-closing" : ""}`,
           role: "listbox",
+          style: box,
           onKeyDown: (event) => {
             if (event.key === "Escape") {
               event.stopPropagation();
@@ -3278,7 +3652,532 @@ window.__ModuleLoader__.load({
         /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "trash-2", size: 14 })
       )));
     }
-    function ModelDialog({ t, model, onSave, onCancel }) {
+    function compatLabel(t, field) {
+      if (field === void 0) return "";
+      const label = t(field.labelKey);
+      return label === field.labelKey ? field.key : label;
+    }
+    function BoolToggle({ t, value, onChange, disabled }) {
+      return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-bool", role: "group" }, [true, false].map((state) => /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          key: String(state),
+          type: "button",
+          className: `dpp-boolBtn${value === state ? " is-on" : ""}`,
+          "aria-pressed": value === state,
+          disabled,
+          onClick: () => onChange(state)
+        },
+        state ? t("compatOn") : t("compatOff")
+      )));
+    }
+    function ThinkingEditor({ t, state, onChange, disabled }) {
+      const modes = [
+        { value: "inherit", label: t("thinkingInherit") },
+        { value: "none", label: t("thinkingNone") },
+        { value: "custom", label: t("thinkingCustom") }
+      ];
+      const used = state.rows.map(([level]) => level);
+      const free = THINKING_LEVELS.filter((level) => !used.includes(level));
+      const setMode = (mode) => {
+        if (mode === "custom") {
+          onChange({ mode, rows: state.rows.length > 0 ? state.rows : initialReasoningRows() });
+          return;
+        }
+        onChange({ mode, rows: [] });
+      };
+      const setRow = (index, entry) => onChange({
+        ...state,
+        rows: state.rows.map((row, at) => at === index ? entry : row)
+      });
+      const removeRow = (index) => onChange({ ...state, rows: state.rows.filter((_, at) => at !== index) });
+      const addRow = () => {
+        if (free.length === 0) return;
+        const highest = used.reduce((top, level) => Math.max(top, THINKING_LEVELS.indexOf(level)), -1);
+        const next = THINKING_LEVELS.find((level, index) => index > highest && !used.includes(level)) || free[0];
+        onChange({ ...state, rows: state.rows.concat([[next, next === "off" ? "" : next]]) });
+      };
+      const problem = reasoningProblem(state);
+      return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-thinking" }, /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.mode,
+          options: modes,
+          onChange: setMode,
+          ariaLabel: t("thinking"),
+          disabled
+        }
+      ), state.mode === "custom" ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-effList" }, state.rows.map(([level, wire], index) => /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvRow", key: `${level}-${index}` }, /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          className: "dpp-effLevel",
+          value: level,
+          ariaLabel: t("thinkingLevel"),
+          disabled,
+          options: THINKING_LEVELS.filter((candidate) => candidate === level || !used.includes(candidate)).map((candidate) => ({ value: candidate, label: t(levelKey(candidate)) })),
+          onChange: (next) => setRow(index, [next, wire])
+        }
+      ), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input dpp-inputMono",
+          value: wire,
+          placeholder: level === "off" ? t("thinkingOffValue") : level,
+          "aria-label": t("thinkingWire"),
+          disabled,
+          onChange: (event) => setRow(index, [level, event.target.value])
+        }
+      ), /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "dpp-iconBtn is-xs is-danger",
+          "aria-label": t("remove"),
+          disabled,
+          onClick: () => removeRow(index)
+        },
+        /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "x", size: 13, strokeWidth: 2.2 })
+      ))), free.length > 0 ? /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-addRow is-compact", disabled, onClick: addRow }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-addRowIcon", "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "plus", size: 13 })), t("thinkingAddLevel")) : null) : null, problem !== "" ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-rowError" }, t(problem)) : null);
+    }
+    function CompatEditor({ t, api, rows, onChange, disabled }) {
+      const [drafts, setDrafts] = import_react2.default.useState({});
+      const fields = compatFieldsFor(api);
+      const used = new Set(rows.map(([key]) => key));
+      const remaining = fields.filter((field) => !used.has(field.key));
+      const setValue = (index, value) => onChange(rows.map((row, at) => at === index ? [row[0], value] : row));
+      const removeAt = (index) => onChange(rows.filter((_, at) => at !== index));
+      const add = (key) => {
+        const field = COMPAT_FIELDS[key];
+        if (field === void 0) return;
+        const seed = field.kind === "bool" ? true : field.kind === "enum" ? field.options[0] : field.kind === "number" ? 1 : {};
+        onChange(rows.concat([[key, seed]]));
+      };
+      if (fields.length === 0) return /* @__PURE__ */ import_react2.default.createElement("p", { className: "dpp-emptyNote" }, t("compatUnavailable"));
+      return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvList" }, rows.map(([key, value], index) => {
+        const field = COMPAT_FIELDS[key];
+        if (field === void 0) return null;
+        let control = null;
+        if (field.kind === "bool") {
+          control = /* @__PURE__ */ import_react2.default.createElement(BoolToggle, { t, value: value !== false, disabled, onChange: (next) => setValue(index, next) });
+        } else if (field.kind === "enum") {
+          control = /* @__PURE__ */ import_react2.default.createElement(
+            SelectMenu,
+            {
+              value,
+              ariaLabel: compatLabel(t, field),
+              disabled,
+              options: field.options.map((option) => ({ value: option, label: option })),
+              onChange: (next) => setValue(index, next)
+            }
+          );
+        } else if (field.kind === "number") {
+          control = /* @__PURE__ */ import_react2.default.createElement(
+            "input",
+            {
+              className: "dpp-input",
+              inputMode: "numeric",
+              value: value === void 0 || value === null ? "" : String(value),
+              "aria-label": compatLabel(t, field),
+              disabled,
+              onChange: (event) => {
+                const parsed = Number(event.target.value);
+                setValue(index, Number.isFinite(parsed) ? parsed : 0);
+              }
+            }
+          );
+        } else {
+          const draft = drafts[key];
+          const text = draft !== void 0 ? draft : formatJsonValue(value);
+          const invalid = draft !== void 0 && parseJsonValue(draft) === null;
+          control = /* @__PURE__ */ import_react2.default.createElement(
+            "input",
+            {
+              className: invalid ? "dpp-input dpp-inputMono is-invalid" : "dpp-input dpp-inputMono",
+              value: text,
+              "aria-label": compatLabel(t, field),
+              "aria-invalid": invalid,
+              placeholder: "{}",
+              disabled,
+              onChange: (event) => {
+                const next = event.target.value;
+                setDrafts((previous) => ({ ...previous, [key]: next }));
+                const parsed = parseJsonValue(next);
+                if (parsed !== null) setValue(index, parsed === void 0 ? {} : parsed);
+              },
+              onBlur: () => {
+                if (parseJsonValue(text) === null) return;
+                setDrafts((previous) => {
+                  const next = { ...previous };
+                  delete next[key];
+                  return next;
+                });
+              }
+            }
+          );
+        }
+        return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvRow", key }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-kvLabel", title: key }, compatLabel(t, field)), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvValue" }, control), /* @__PURE__ */ import_react2.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dpp-iconBtn is-xs is-danger",
+            "aria-label": t("remove"),
+            disabled,
+            onClick: () => removeAt(index)
+          },
+          /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "x", size: 13, strokeWidth: 2.2 })
+        ));
+      }), remaining.length > 0 ? /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          className: "dpp-addMenu",
+          value: "",
+          placeholder: t("compatAdd"),
+          ariaLabel: t("compatAdd"),
+          disabled,
+          options: remaining.map((field) => ({ value: field.key, label: compatLabel(t, field) })),
+          onChange: add
+        }
+      ) : null);
+    }
+    function AdvancedSection({ title, children }) {
+      return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advSection" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-advLabel" }, title), children);
+    }
+    function AdvancedCard({ t, api, state, onChange, disabled }) {
+      const [open, setOpen] = import_react2.default.useState(() => advancedCount(state) > 0);
+      const count = advancedCount(state);
+      const set = (patch) => onChange({ ...state, ...patch });
+      const clearOption = { value: "", label: t("advUnset") };
+      const options = (values, labels) => [clearOption].concat(values.map((value) => ({
+        value,
+        label: labels !== void 0 && labels[value] !== void 0 ? `${labels[value]} \xB7 ${value}` : value
+      })));
+      return /* @__PURE__ */ import_react2.default.createElement("section", { className: "dpp-advBlock" }, /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "dpp-advHead",
+          "aria-expanded": open,
+          onClick: () => setOpen((value) => !value)
+        },
+        /* @__PURE__ */ import_react2.default.createElement(Icon, { name: open ? "chevron-down" : "chevron-right", size: 14, className: "dpp-advChevron" }),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-advTitle" }, t("advanced")),
+        count > 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge" }, count) : null
+      ), open ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advBody" }, /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advDefaults") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advReasoning")), /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.reasoning,
+          ariaLabel: t("advReasoning"),
+          disabled,
+          options: [clearOption].concat(THINKING_LEVELS.map((level) => ({ value: level, label: levelLabel(t, level) }))),
+          onChange: (next) => set({ reasoning: next })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultContext")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.defaultContextWindow,
+          placeholder: "262144",
+          "aria-label": t("advDefaultContext"),
+          disabled,
+          onChange: (event) => set({ defaultContextWindow: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultMaxTokens")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.defaultMaxTokens,
+          placeholder: "32768",
+          "aria-label": t("advDefaultMaxTokens"),
+          disabled,
+          onChange: (event) => set({ defaultMaxTokens: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultInput")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-chipRow" }, MODALITIES.map((kind) => {
+        const on = state.defaultInput.includes(kind);
+        return /* @__PURE__ */ import_react2.default.createElement(
+          "button",
+          {
+            key: kind,
+            type: "button",
+            className: `dpp-chip${on ? " is-on" : ""}`,
+            "aria-pressed": on,
+            disabled,
+            onClick: () => set({
+              defaultInput: on ? state.defaultInput.filter((item) => item !== kind) : state.defaultInput.concat([kind])
+            })
+          },
+          on ? /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "check", size: 12, strokeWidth: 2.6 }) : null,
+          kind === "text" ? t("inputText") : t("inputImage")
+        );
+      })))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advThinkingBudgets")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-budgetGrid" }, THINKING_BUDGET_LEVELS.map((level) => /* @__PURE__ */ import_react2.default.createElement("label", { className: "dpp-budgetCell", key: level }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-chipLabel" }, level), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.thinkingBudgets[level],
+          "aria-label": `${t("advThinkingBudgets")} ${level}`,
+          disabled,
+          onChange: (event) => set({
+            thinkingBudgets: { ...state.thinkingBudgets, [level]: event.target.value }
+          })
+        }
+      )))))), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advHeaders") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvList" }, state.headers.map(([name2, value], index) => /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvRow", key: index }, /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input dpp-kvKey",
+          value: name2,
+          placeholder: t("headerName"),
+          "aria-label": t("headerName"),
+          disabled,
+          onChange: (event) => set({
+            headers: state.headers.map((row, at) => at === index ? [event.target.value, row[1]] : row)
+          })
+        }
+      ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvValue" }, /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          value,
+          placeholder: t("headerValue"),
+          "aria-label": t("headerValue"),
+          disabled,
+          onChange: (event) => set({
+            headers: state.headers.map((row, at) => at === index ? [row[0], event.target.value] : row)
+          })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "dpp-iconBtn is-xs is-danger",
+          "aria-label": t("remove"),
+          disabled,
+          onClick: () => set({ headers: state.headers.filter((_, at) => at !== index) })
+        },
+        /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "x", size: 13, strokeWidth: 2.2 })
+      ))), /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "dpp-addRow is-compact",
+          disabled,
+          onClick: () => set({ headers: state.headers.concat([["", ""]]) })
+        },
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-addRowIcon", "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "plus", size: 13 })),
+        t("addHeader")
+      ))), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advCompat") }, /* @__PURE__ */ import_react2.default.createElement(
+        CompatEditor,
+        {
+          t,
+          api,
+          rows: state.compat,
+          onChange: (rows) => set({ compat: rows }),
+          disabled
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advConnection") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advTransport")), /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.transport,
+          ariaLabel: t("advTransport"),
+          disabled,
+          options: options(TRANSPORTS),
+          onChange: (next) => set({ transport: next })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advCacheRetention")), /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.cacheRetention,
+          ariaLabel: t("advCacheRetention"),
+          disabled,
+          options: options(CACHE_RETENTIONS),
+          onChange: (next) => set({ cacheRetention: next })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advTimeout")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.timeoutMs,
+          "aria-label": t("advTimeout"),
+          disabled,
+          onChange: (event) => set({ timeoutMs: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advStreamIdle")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.streamIdleTimeoutMs,
+          placeholder: "300000",
+          "aria-label": t("advStreamIdle"),
+          disabled,
+          onChange: (event) => set({ streamIdleTimeoutMs: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advWsConnect")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.websocketConnectTimeoutMs,
+          "aria-label": t("advWsConnect"),
+          disabled,
+          onChange: (event) => set({ websocketConnectTimeoutMs: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advRetry")), /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.retryMode,
+          ariaLabel: t("advRetry"),
+          disabled,
+          options: options(RETRY_MODES, { normal: t("advRetryNormal"), always: t("advRetryAlways") }),
+          onChange: (next) => set({ retryMode: next })
+        }
+      )), state.retryMode === "normal" ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advMaxRetries")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.maxRetries,
+          placeholder: "5",
+          "aria-label": t("advMaxRetries"),
+          disabled,
+          onChange: (event) => set({ maxRetries: event.target.value })
+        }
+      )) : null)), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advImages") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advPixelBudget")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.requestImagePixelBudget,
+          placeholder: "4194304",
+          "aria-label": t("advPixelBudget"),
+          disabled,
+          onChange: (event) => set({ requestImagePixelBudget: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advImageMaxBytes")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.requestImageMaxBytes,
+          placeholder: "1048576",
+          "aria-label": t("advImageMaxBytes"),
+          disabled,
+          onChange: (event) => set({ requestImageMaxBytes: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advMaxRequestImageBytes")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.maxRequestImageBytes,
+          placeholder: "20971520",
+          "aria-label": t("advMaxRequestImageBytes"),
+          disabled,
+          onChange: (event) => set({ maxRequestImageBytes: event.target.value })
+        }
+      ))))) : null);
+    }
+    function DeepseekAdvancedCard({ t, state, onChange, disabled }) {
+      const [open, setOpen] = import_react2.default.useState(() => deepseekCount(state) > 0);
+      const count = deepseekCount(state);
+      const set = (patch) => onChange({ ...state, ...patch });
+      const clearOption = { value: "", label: t("advUnset") };
+      return /* @__PURE__ */ import_react2.default.createElement("section", { className: "dpp-advBlock" }, /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: "dpp-advHead",
+          "aria-expanded": open,
+          onClick: () => setOpen((value) => !value)
+        },
+        /* @__PURE__ */ import_react2.default.createElement(Icon, { name: open ? "chevron-down" : "chevron-right", size: 14, className: "dpp-advChevron" }),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-advTitle" }, t("advanced")),
+        count > 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge" }, count) : null
+      ), open ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advBody" }, /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advDefaults") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advThinking")), /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.thinking,
+          ariaLabel: t("advThinking"),
+          disabled,
+          options: [
+            clearOption,
+            { value: "enabled", label: t("advThinkingOn") },
+            { value: "disabled", label: t("advThinkingOff") }
+          ],
+          onChange: (next) => set({ thinking: next })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advReasoningEffort")), /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.reasoningEffort,
+          ariaLabel: t("advReasoningEffort"),
+          disabled,
+          options: [clearOption].concat(DEEPSEEK_EFFORTS.map((level) => ({
+            value: level,
+            label: levelLabel(t, level)
+          }))),
+          onChange: (next) => set({ reasoningEffort: next })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advMaxTokens")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.maxTokens,
+          "aria-label": t("advMaxTokens"),
+          disabled,
+          onChange: (event) => set({ maxTokens: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultContext")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.defaultContextWindow,
+          placeholder: "262144",
+          "aria-label": t("advDefaultContext"),
+          disabled,
+          onChange: (event) => set({ defaultContextWindow: event.target.value })
+        }
+      )))), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advConnection") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advStreamIdle")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.streamIdleTimeoutMs,
+          "aria-label": t("advStreamIdle"),
+          disabled,
+          onChange: (event) => set({ streamIdleTimeoutMs: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advRetry")), /* @__PURE__ */ import_react2.default.createElement(
+        SelectMenu,
+        {
+          value: state.retryMode,
+          ariaLabel: t("advRetry"),
+          disabled,
+          options: [
+            clearOption,
+            { value: "normal", label: t("advRetryNormal") },
+            { value: "always", label: t("advRetryAlways") }
+          ],
+          onChange: (next) => set({ retryMode: next })
+        }
+      )), state.retryMode === "normal" ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advMaxRetries")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.maxRetries,
+          placeholder: "5",
+          "aria-label": t("advMaxRetries"),
+          disabled,
+          onChange: (event) => set({ maxRetries: event.target.value })
+        }
+      )) : null))) : null);
+    }
+    function ModelDialog({ t, model, api, showAdvanced, onSave, onCancel }) {
       const initial = {
         id: model.id || "",
         name: model.name || "",
@@ -3287,6 +4186,9 @@ window.__ModuleLoader__.load({
         input: Array.isArray(model.input) && model.input.length > 0 ? model.input : ["text"]
       };
       const [form, setForm] = import_react2.default.useState(initial);
+      const [thinking, setThinking] = import_react2.default.useState(() => readReasoning(model));
+      const [compat, setCompat] = import_react2.default.useState(() => readCompat(model.compat, api));
+      const [compatOpen, setCompatOpen] = import_react2.default.useState(() => readCompat(model.compat, api).length > 0);
       const [error, setError] = import_react2.default.useState("");
       const set = (patch) => setForm((previous) => ({ ...previous, ...patch }));
       const toggleInput = (kind) => setForm((previous) => ({
@@ -3299,16 +4201,35 @@ window.__ModuleLoader__.load({
           setError(t("needModelId"));
           return;
         }
-        const contextWindow = form.contextWindow.trim() === "" ? void 0 : Number(form.contextWindow);
-        const maxTokens = form.maxTokens.trim() === "" ? void 0 : Number(form.maxTokens);
-        onSave({
-          ...model,
-          id,
-          name: form.name.trim() || void 0,
-          contextWindow: Number.isFinite(contextWindow) ? contextWindow : void 0,
-          maxTokens: Number.isFinite(maxTokens) ? maxTokens : void 0,
-          input: form.input.length > 0 ? form.input : void 0
-        });
+        const problem = reasoningProblem(thinking);
+        if (problem !== "") {
+          setError(t(problem));
+          return;
+        }
+        const contextWindow = parseNumber(form.contextWindow);
+        const maxTokens = parseNumber(form.maxTokens);
+        const next = { ...model, id };
+        next.name = form.name.trim();
+        if (next.name === "") delete next.name;
+        if (contextWindow === void 0) delete next.contextWindow;
+        else next.contextWindow = contextWindow;
+        if (maxTokens === void 0) delete next.maxTokens;
+        else next.maxTokens = maxTokens;
+        if (form.input.length > 0) next.input = form.input;
+        else delete next.input;
+        const withThinking = showAdvanced ? applyReasoning(next, thinking) : next;
+        if (showAdvanced) {
+          const declared = writeCompat(compat);
+          if (declared === void 0) delete withThinking.compat;
+          else withThinking.compat = declared;
+        }
+        onSave(withThinking);
+      };
+      const reset = () => {
+        setForm(initial);
+        setThinking(readReasoning(model));
+        setCompat(readCompat(model.compat, api));
+        setError("");
       };
       return /* @__PURE__ */ import_react2.default.createElement(
         Modal,
@@ -3316,18 +4237,8 @@ window.__ModuleLoader__.load({
           open: true,
           onClose: onCancel,
           title: t("editModel"),
-          footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(
-            "button",
-            {
-              type: "button",
-              className: "dpp-btn dpp-btnGhost",
-              onClick: () => {
-                setForm(initial);
-                setError("");
-              }
-            },
-            t("resetForm")
-          ), /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-footGap" }), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: onCancel }, t("cancel")), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnPrimary", onClick: submit, disabled: form.id.trim() === "" }, t("save")))
+          className: "dpp-modalModel",
+          footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: reset }, t("resetForm")), /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-footGap" }), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: onCancel }, t("cancel")), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnPrimary", onClick: submit, disabled: form.id.trim() === "" }, t("save")))
         },
         /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("modelId"), wide: true }, /* @__PURE__ */ import_react2.default.createElement(
           "input",
@@ -3389,6 +4300,18 @@ window.__ModuleLoader__.load({
             item.label
           );
         }))),
+        showAdvanced ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "sparkles", size: 13, className: "dpp-fieldIcon" }), t("thinking")), /* @__PURE__ */ import_react2.default.createElement(ThinkingEditor, { t, state: thinking, onChange: setThinking })), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advInline" }, /* @__PURE__ */ import_react2.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dpp-advToggle",
+            "aria-expanded": compatOpen,
+            onClick: () => setCompatOpen((value) => !value)
+          },
+          /* @__PURE__ */ import_react2.default.createElement(Icon, { name: compatOpen ? "chevron-down" : "chevron-right", size: 13 }),
+          t("compat"),
+          compat.length > 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge" }, compat.length) : null
+        ), compatOpen ? /* @__PURE__ */ import_react2.default.createElement(CompatEditor, { t, api, rows: compat, onChange: setCompat }) : null)) : null,
         error !== "" ? /* @__PURE__ */ import_react2.default.createElement(Alert, { kind: "err", text: error }) : null
       );
     }
@@ -3497,6 +4420,7 @@ window.__ModuleLoader__.load({
       const [data, setData] = import_react2.default.useState(null);
       const [draft, setDraft] = import_react2.default.useState(null);
       const [models, setModels] = import_react2.default.useState([]);
+      const [advanced, setAdvanced] = import_react2.default.useState(null);
       const [showKey, setShowKey] = import_react2.default.useState(false);
       const [keyDraft, setKeyDraft] = import_react2.default.useState("");
       const [keyEditing, setKeyEditing] = import_react2.default.useState(false);
@@ -3521,6 +4445,8 @@ window.__ModuleLoader__.load({
           baseURL: result.baseURL || ""
         });
         setModels((Array.isArray(result.models) ? result.models : []).map((model) => ({ ...model })));
+        const rawAdvanced = result.advanced !== null && typeof result.advanced === "object" ? result.advanced : {};
+        setAdvanced(result.source === "deepseek" ? readDeepseekAdvanced(rawAdvanced) : readAdvanced({ ...rawAdvanced, api: result.api }));
         setLoadError("");
       }, []);
       const load = import_react2.default.useCallback(async () => {
@@ -3556,13 +4482,18 @@ window.__ModuleLoader__.load({
         displayName: data.displayName || "",
         api: data.api || "",
         baseURL: data.baseURL || "",
-        models: Array.isArray(data.models) ? data.models : []
+        models: Array.isArray(data.models) ? data.models : [],
+        advanced: data.source === "deepseek" ? readDeepseekAdvanced(data.advanced) : readAdvanced({
+          ...data.advanced !== null && typeof data.advanced === "object" ? data.advanced : {},
+          api: data.api
+        })
       }), [data]);
       const current = draft === null ? "" : JSON.stringify({
         displayName: draft.displayName,
         api: draft.api,
         baseURL: draft.baseURL,
-        models
+        models,
+        advanced
       });
       const pendingKey = keyEditing && keyDraft.trim() !== "" && keyDraft !== secret;
       const dirty = baseline !== "" && (baseline !== current || pendingKey);
@@ -3585,6 +4516,9 @@ window.__ModuleLoader__.load({
               return next;
             })
           };
+          if (advanced !== null) {
+            patch.advanced = data !== null && isOfficial(data) ? buildDeepseekPatch(advanced) : buildAdvancedPatch(advanced);
+          }
           const nextKey = pendingKey ? keyDraft.trim() : "";
           const result = await call(
             "saveProvider",
@@ -3604,7 +4538,7 @@ window.__ModuleLoader__.load({
         } finally {
           setBusy(false);
         }
-      }, [busy, call, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, route, t]);
+      }, [advanced, busy, call, data, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, route, t]);
       import_react2.default.useEffect(() => {
         const onKeyDown = (event) => {
           if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
@@ -3921,7 +4855,24 @@ window.__ModuleLoader__.load({
           testing,
           testResult
         }
-      ))), /* @__PURE__ */ import_react2.default.createElement("footer", { className: "dpp-cardFoot" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-dirty${dirtyNow ? " is-on" : ""}` }, dirtyNow ? t("unsaved") : ""), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: () => {
+      )), advanced !== null ? official ? /* @__PURE__ */ import_react2.default.createElement(
+        DeepseekAdvancedCard,
+        {
+          t,
+          state: advanced,
+          onChange: setAdvanced,
+          disabled: readOnly || busy
+        }
+      ) : /* @__PURE__ */ import_react2.default.createElement(
+        AdvancedCard,
+        {
+          t,
+          api: draft.api,
+          state: advanced,
+          onChange: setAdvanced,
+          disabled: readOnly || busy
+        }
+      ) : null), /* @__PURE__ */ import_react2.default.createElement("footer", { className: "dpp-cardFoot" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-dirty${dirtyNow ? " is-on" : ""}` }, dirtyNow ? t("unsaved") : ""), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: () => {
         void load();
       }, disabled: busy }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "refresh-cw", size: 14 }), t("reload")), /* @__PURE__ */ import_react2.default.createElement(
         "button",
@@ -3940,6 +4891,8 @@ window.__ModuleLoader__.load({
         {
           t,
           model: editor.model,
+          api: draft.api,
+          showAdvanced: !official,
           onSave: saveEditor,
           onCancel: () => setEditor(null)
         }
@@ -4469,7 +5422,7 @@ window.__ModuleLoader__.load({
     .dpp-selectValue{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .dpp-selectChevron{color:var(--dpp-fg3);transition:transform var(--dpp-t) var(--dpp-ease)}
     .dpp-selectTrigger.is-open .dpp-selectChevron{transform:rotate(180deg)}
-    .dpp-selectPopover{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;padding:4px;border:1px solid var(--dpp-line);border-radius:var(--dpp-r);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);animation:dppPopIn var(--dpp-t) var(--dpp-ease)}
+    .dpp-selectPopover{position:fixed;z-index:90;overflow:auto;scrollbar-width:thin;padding:4px;border:1px solid var(--dpp-line);border-radius:var(--dpp-r);background:var(--dpp-surface);box-shadow:var(--dpp-shadow);animation:dppPopIn var(--dpp-t) var(--dpp-ease)}
     .dpp-selectPopover.is-closing{animation:dppFadeOut var(--dpp-t-fast) ease-in forwards}
     .dpp-selectOption{display:flex;align-items:center;gap:6px;width:100%;height:30px;padding:0 8px;border:0;border-radius:var(--dpp-r-xs);background:transparent;color:var(--dpp-fg);font:inherit;font-size:12.5px;text-align:left;cursor:pointer;transition:background var(--dpp-t-fast)}
     .dpp-selectOption.is-active{background:var(--dpp-hover)}
@@ -4655,6 +5608,61 @@ window.__ModuleLoader__.load({
     .dpp-toastClose{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;border:0;border-radius:6px;background:transparent;color:var(--dpp-fg4);cursor:pointer;transition:background var(--dpp-t),color var(--dpp-t)}
     .dpp-toastClose:hover{background:var(--dpp-hover);color:var(--dpp-fg)}
 
+
+    /* -------------------------------------------------------- advanced editors */
+    .dpp-fieldIcon{color:var(--dpp-fg4)}
+    .dpp-modalModel{width:min(560px,100%)}
+    .dpp-input.is-invalid{border-color:var(--dpp-bad);box-shadow:0 0 0 3px var(--dpp-badSoft)}
+    .dpp-emptyNote{margin:0;color:var(--dpp-fg3);font-size:12px;line-height:1.5}
+
+    .dpp-thinking{display:flex;flex-direction:column;gap:8px}
+    .dpp-effList{display:flex;flex-direction:column;gap:6px}
+    .dpp-effList .dpp-kvRow{grid-template-columns:132px minmax(0,1fr) 26px}
+    .dpp-effLevel .dpp-selectTrigger{height:30px}
+    .dpp-rowError{color:var(--dpp-badLabel);font-size:11.5px;line-height:1.5}
+
+    .dpp-kvList{display:flex;flex-direction:column;gap:6px}
+    .dpp-kvRow{display:grid;grid-template-columns:minmax(112px,auto) minmax(0,1fr) 26px;align-items:center;gap:8px;min-height:30px}
+    .dpp-kvRow.is-wide{grid-template-columns:minmax(0,1fr)}
+    .dpp-kvLabel{color:var(--dpp-fg2);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .dpp-kvValue{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
+    .dpp-kvValue > .dpp-input,.dpp-kvValue > .dpp-selectMenu{flex:1 1 auto;min-width:0}
+    .dpp-kvKey{min-width:0}
+    .dpp-kvRow .dpp-input{height:30px}
+    .dpp-kvRow .dpp-selectTrigger{height:30px;font-size:12px}
+
+    .dpp-bool{display:inline-flex;align-items:center;height:30px;padding:2px;border:1px solid var(--dpp-line);border-radius:var(--dpp-r-sm);background:var(--dpp-surface2)}
+    .dpp-boolBtn{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:38px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--dpp-fg3);font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background var(--dpp-t),color var(--dpp-t)}
+    .dpp-boolBtn:hover:not(:disabled):not(.is-on){color:var(--dpp-fg)}
+    .dpp-boolBtn.is-on{background:var(--dpp-surface);color:var(--dpp-fg);box-shadow:var(--dpp-shadowSm)}
+    .dpp-boolBtn:disabled{opacity:.5;cursor:not-allowed}
+
+    .dpp-addRow.is-compact{height:32px;font-size:12px;gap:8px}
+    .dpp-addRow.is-compact .dpp-addRowIcon{width:18px;height:18px}
+
+    .dpp-addMenu .dpp-selectTrigger{height:32px;border-style:dashed;border-color:var(--dpp-line);background:transparent;color:var(--dpp-fg3);font-size:12px}
+    .dpp-addMenu .dpp-selectTrigger:hover:not(:disabled){border-color:var(--dpp-brand);color:var(--dpp-brand);background:var(--dpp-brandSoft)}
+    .dpp-addMenu .dpp-selectChevron{opacity:0}
+
+    /* --------------------------------------------------------- advanced block */
+    .dpp-advBlock{margin:2px -18px -18px;border-top:1px solid var(--dpp-line1)}
+    .dpp-advHead{display:flex;align-items:center;gap:7px;width:100%;height:42px;padding:0 18px;border:0;background:transparent;color:var(--dpp-fg2);font:inherit;font-size:12.5px;font-weight:500;text-align:left;cursor:pointer;transition:background var(--dpp-t),color var(--dpp-t)}
+    .dpp-advHead:hover{background:var(--dpp-hover);color:var(--dpp-fg)}
+    .dpp-advHead:focus-visible{outline:2px solid var(--dpp-brand);outline-offset:-2px}
+    .dpp-advChevron{color:var(--dpp-fg4)}
+    .dpp-advTitle{letter-spacing:.01em}
+    .dpp-advBody{display:flex;flex-direction:column;gap:16px;padding:2px 18px 18px;animation:dppViewIn var(--dpp-t) var(--dpp-ease) backwards}
+    .dpp-advSection{display:flex;flex-direction:column;gap:10px}
+    .dpp-advLabel{color:var(--dpp-fg3);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+    .dpp-advInline{display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px solid var(--dpp-line1)}
+    .dpp-advToggle{display:flex;align-items:center;gap:6px;align-self:flex-start;height:26px;padding:0 4px;border:0;border-radius:var(--dpp-r-xs);background:transparent;color:var(--dpp-fg2);font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background var(--dpp-t),color var(--dpp-t)}
+    .dpp-advToggle:hover{background:var(--dpp-hover);color:var(--dpp-fg)}
+    .dpp-advToggle:focus-visible{outline:2px solid var(--dpp-brand);outline-offset:1px}
+
+    .dpp-budgetGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+    .dpp-budgetCell{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .dpp-chipLabel{color:var(--dpp-fg4);font-size:10.5px;letter-spacing:.02em}
+
     /* ------------------------------------------------------------ reduced motion */
     @media (prefers-reduced-motion: reduce){
       .dpp-root *,.dpp-root *::before,.dpp-root *::after{
@@ -4762,7 +5770,90 @@ window.__ModuleLoader__.load({
       created: "\u4F9B\u5E94\u5546\u5DF2\u521B\u5EFA",
       saveFailed: "\u64CD\u4F5C\u5931\u8D25",
       discoverFailed: "\u62C9\u53D6\u6A21\u578B\u5931\u8D25",
-      duplicateModel: "\u8FD9\u4E2A\u6A21\u578B ID \u5DF2\u7ECF\u5B58\u5728"
+      duplicateModel: "\u8FD9\u4E2A\u6A21\u578B ID \u5DF2\u7ECF\u5B58\u5728",
+      // 模型：思考能力 / 兼容性
+      thinking: "\u601D\u8003\u80FD\u529B",
+      thinkingInherit: "\u7EE7\u627F\u5185\u7F6E\u76EE\u5F55",
+      thinkingNone: "\u4E0D\u652F\u6301\u601D\u8003",
+      thinkingCustom: "\u81EA\u5B9A\u4E49\u7B49\u7EA7",
+      thinkingLevel: "\u7B49\u7EA7",
+      thinkingWire: "\u53D1\u9001\u503C",
+      thinkingOffValue: "\u4E0D\u53D1\u9001",
+      thinkingAddLevel: "\u6DFB\u52A0\u7B49\u7EA7",
+      thinkingNeedsLevel: "\u81F3\u5C11\u4FDD\u7559\u4E00\u4E2A off \u4EE5\u5916\u7684\u7B49\u7EA7",
+      thinkingNeedsWire: "\u6BCF\u4E2A\u7B49\u7EA7\u90FD\u8981\u6709\u53D1\u9001\u503C\uFF0Coff \u53EF\u4EE5\u7559\u7A7A",
+      compat: "\u517C\u5BB9\u6027",
+      compatAdd: "\u6DFB\u52A0\u5F00\u5173",
+      compatOn: "\u5F00",
+      compatOff: "\u5173",
+      compatUnavailable: "\u5F53\u524D\u534F\u8BAE\u6CA1\u6709\u53EF\u914D\u7F6E\u7684\u517C\u5BB9\u5F00\u5173",
+      // 供应商：高级
+      advanced: "\u9AD8\u7EA7",
+      advUnset: "\u7EE7\u627F\u9ED8\u8BA4",
+      advDefaults: "\u9ED8\u8BA4\u6863\u4F4D",
+      advReasoning: "\u9ED8\u8BA4\u601D\u8003\u7B49\u7EA7",
+      advDefaultContext: "\u7F3A\u7701\u4E0A\u4E0B\u6587",
+      advDefaultMaxTokens: "\u7F3A\u7701\u8F93\u51FA\u4E0A\u9650",
+      advDefaultInput: "\u7F3A\u7701\u8F93\u5165\u6A21\u6001",
+      advThinkingBudgets: "\u601D\u8003\u9884\u7B97",
+      advHeaders: "\u8BF7\u6C42\u5934",
+      headerName: "\u540D\u79F0",
+      headerValue: "\u503C",
+      addHeader: "\u6DFB\u52A0\u8BF7\u6C42\u5934",
+      advCompat: "\u517C\u5BB9\u6027",
+      advConnection: "\u8FDE\u63A5\u4E0E\u91CD\u8BD5",
+      advTransport: "\u4F20\u8F93\u65B9\u5F0F",
+      advCacheRetention: "\u7F13\u5B58\u4FDD\u7559",
+      advTimeout: "\u8BF7\u6C42\u8D85\u65F6 (ms)",
+      advStreamIdle: "\u6D41\u7A7A\u95F2\u8D85\u65F6 (ms)",
+      advWsConnect: "WebSocket \u8FDE\u63A5\u8D85\u65F6 (ms)",
+      advRetry: "\u91CD\u8BD5\u7B56\u7565",
+      advRetryNormal: "\u6309\u9519\u8BEF\u7801\u91CD\u8BD5",
+      advRetryAlways: "\u603B\u662F\u91CD\u8BD5",
+      advMaxRetries: "\u6700\u5927\u91CD\u8BD5\u6B21\u6570",
+      advImages: "\u56FE\u7247\u9884\u7B97",
+      advPixelBudget: "\u5355\u56FE\u50CF\u7D20\u9884\u7B97",
+      advImageMaxBytes: "\u5355\u56FE\u5B57\u8282\u4E0A\u9650",
+      advMaxRequestImageBytes: "\u8BF7\u6C42\u56FE\u7247\u603B\u91CF",
+      // 兼容开关
+      cfSupportsStore: "\u4F1A\u8BDD\u5B58\u50A8 store",
+      cfSupportsDeveloperRole: "developer \u89D2\u8272",
+      cfSupportsReasoningEffort: "reasoning_effort \u5B57\u6BB5",
+      cfSupportsUsageInStreaming: "\u6D41\u5F0F\u7528\u91CF\u7EDF\u8BA1",
+      cfSupportsFinishReason: "finish_reason \u5B57\u6BB5",
+      cfMaxTokensField: "\u8F93\u51FA\u4E0A\u9650\u5B57\u6BB5",
+      cfRequiresToolResultName: "\u5DE5\u5177\u7ED3\u679C\u5E26 name",
+      cfRequiresAssistantAfterToolResult: "\u5DE5\u5177\u7ED3\u679C\u540E\u9700 assistant",
+      cfRequiresThinkingAsText: "\u601D\u8003\u4EE5\u6587\u672C\u53D1\u9001",
+      cfRequiresReasoningContent: "\u5386\u53F2\u5E26 reasoning_content",
+      cfThinkingFormat: "\u601D\u8003\u5B57\u6BB5\u683C\u5F0F",
+      cfChatTemplateKwargs: "chat_template_kwargs",
+      cfChatTemplateArgs: "chat_template_args",
+      cfSupportsThinkingTokenBudget: "\u601D\u8003\u9884\u7B97\u5B57\u6BB5",
+      cfThinkingTokenBudgetField: "\u601D\u8003\u9884\u7B97\u5B57\u6BB5\u540D",
+      cfVllmPriority: "vLLM \u4F18\u5148\u7EA7",
+      cfSupportsStrictMode: "\u4E25\u683C\u6A21\u5F0F",
+      cfCacheControlFormat: "\u7F13\u5B58\u6807\u8BB0\u683C\u5F0F",
+      cfSupportsLongCacheRetention: "\u957F\u7F13\u5B58\u4FDD\u7559",
+      cfSupportsMaxOutputTokens: "max_output_tokens \u5B57\u6BB5",
+      cfSupportsEagerToolInputStreaming: "\u5DE5\u5177\u53C2\u6570\u6D41\u5F0F",
+      cfSupportsCacheControlOnTools: "\u5DE5\u5177\u58F0\u660E\u7F13\u5B58\u6807\u8BB0",
+      cfSupportsTemperature: "temperature \u5B57\u6BB5",
+      cfForceAdaptiveThinking: "\u5F3A\u5236\u81EA\u9002\u5E94\u601D\u8003",
+      cfAllowEmptySignature: "\u5141\u8BB8\u7A7A\u7B7E\u540D",
+      cfSupportsStrictTools: "\u4E25\u683C\u5DE5\u5177 schema",
+      levelOff: "\u5173",
+      levelMinimal: "\u6700\u5C0F",
+      levelLow: "\u4F4E",
+      levelMedium: "\u4E2D",
+      levelHigh: "\u9AD8",
+      levelXhigh: "\u8D85\u9AD8",
+      levelMax: "\u6700\u9AD8",
+      advThinking: "\u601D\u8003\u6A21\u5F0F",
+      advThinkingOn: "\u5F00\u542F",
+      advThinkingOff: "\u5173\u95ED",
+      advReasoningEffort: "\u63A8\u7406\u7B49\u7EA7",
+      advMaxTokens: "\u8F93\u51FA\u4E0A\u9650"
     };
     var EN = {
       nav: "Providers",
@@ -4857,7 +5948,90 @@ window.__ModuleLoader__.load({
       created: "Provider created",
       saveFailed: "Request failed",
       discoverFailed: "Could not fetch models",
-      duplicateModel: "That model ID already exists"
+      duplicateModel: "That model ID already exists",
+      // model: thinking / compatibility
+      thinking: "Thinking",
+      thinkingInherit: "Inherit catalog",
+      thinkingNone: "Not a reasoning model",
+      thinkingCustom: "Custom levels",
+      thinkingLevel: "Level",
+      thinkingWire: "Wire value",
+      thinkingOffValue: "not sent",
+      thinkingAddLevel: "Add level",
+      thinkingNeedsLevel: "Keep at least one level besides off",
+      thinkingNeedsWire: "Every level needs a wire value; off may stay empty",
+      compat: "Compatibility",
+      compatAdd: "Add switch",
+      compatOn: "On",
+      compatOff: "Off",
+      compatUnavailable: "This protocol has no configurable switches",
+      // provider: advanced
+      advanced: "Advanced",
+      advUnset: "Inherit",
+      advDefaults: "Defaults",
+      advReasoning: "Default thinking level",
+      advDefaultContext: "Default context",
+      advDefaultMaxTokens: "Default output cap",
+      advDefaultInput: "Default input formats",
+      advThinkingBudgets: "Thinking budgets",
+      advHeaders: "Request headers",
+      headerName: "Name",
+      headerValue: "Value",
+      addHeader: "Add header",
+      advCompat: "Compatibility",
+      advConnection: "Transport and retry",
+      advTransport: "Transport",
+      advCacheRetention: "Cache retention",
+      advTimeout: "Request timeout (ms)",
+      advStreamIdle: "Stream idle timeout (ms)",
+      advWsConnect: "WebSocket connect timeout (ms)",
+      advRetry: "Retry policy",
+      advRetryNormal: "Retry by error code",
+      advRetryAlways: "Always retry",
+      advMaxRetries: "Max retries",
+      advImages: "Image budgets",
+      advPixelBudget: "Pixel budget per image",
+      advImageMaxBytes: "Bytes per image",
+      advMaxRequestImageBytes: "Image bytes per request",
+      // compatibility switches
+      cfSupportsStore: "store field",
+      cfSupportsDeveloperRole: "developer role",
+      cfSupportsReasoningEffort: "reasoning_effort field",
+      cfSupportsUsageInStreaming: "usage in stream",
+      cfSupportsFinishReason: "finish_reason field",
+      cfMaxTokensField: "Output cap field",
+      cfRequiresToolResultName: "Tool result needs name",
+      cfRequiresAssistantAfterToolResult: "Assistant after tool result",
+      cfRequiresThinkingAsText: "Send thinking as text",
+      cfRequiresReasoningContent: "reasoning_content in history",
+      cfThinkingFormat: "Thinking format",
+      cfChatTemplateKwargs: "chat_template_kwargs",
+      cfChatTemplateArgs: "chat_template_args",
+      cfSupportsThinkingTokenBudget: "Thinking budget field",
+      cfThinkingTokenBudgetField: "Thinking budget field name",
+      cfVllmPriority: "vLLM priority",
+      cfSupportsStrictMode: "Strict mode",
+      cfCacheControlFormat: "Cache marker format",
+      cfSupportsLongCacheRetention: "Long cache retention",
+      cfSupportsMaxOutputTokens: "max_output_tokens field",
+      cfSupportsEagerToolInputStreaming: "Stream tool arguments",
+      cfSupportsCacheControlOnTools: "Cache markers on tools",
+      cfSupportsTemperature: "temperature field",
+      cfForceAdaptiveThinking: "Force adaptive thinking",
+      cfAllowEmptySignature: "Allow empty signature",
+      cfSupportsStrictTools: "Strict tool schema",
+      levelOff: "Off",
+      levelMinimal: "Minimal",
+      levelLow: "Low",
+      levelMedium: "Medium",
+      levelHigh: "High",
+      levelXhigh: "X-High",
+      levelMax: "Max",
+      advThinking: "Thinking mode",
+      advThinkingOn: "Enabled",
+      advThinkingOff: "Disabled",
+      advReasoningEffort: "Reasoning level",
+      advMaxTokens: "Output cap"
     };
 
     // src/client/entry.jsx

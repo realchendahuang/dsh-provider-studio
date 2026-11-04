@@ -28,6 +28,33 @@ import React from 'react'
 import { PROVIDER_TEMPLATES, CUSTOM_TEMPLATE } from './templates.js'
 import { PROVIDER_ICONS, iconForProvider } from './icons.js'
 import { Icon } from './ui-icons.jsx'
+import {
+  THINKING_LEVELS,
+  levelKey,
+  levelLabel,
+  COMPAT_FIELDS,
+  compatFieldsFor,
+  readReasoning,
+  applyReasoning,
+  initialReasoningRows,
+  reasoningProblem,
+  readCompat,
+  writeCompat,
+  parseJsonValue,
+  formatJsonValue,
+  TRANSPORTS,
+  CACHE_RETENTIONS,
+  RETRY_MODES,
+  MODALITIES,
+  THINKING_BUDGET_LEVELS,
+  readAdvanced,
+  advancedCount,
+  buildAdvancedPatch,
+  DEEPSEEK_EFFORTS,
+  readDeepseekAdvanced,
+  deepseekCount,
+  buildDeepseekPatch,
+} from './fields.js'
 
 const PROTO_LABELS = {
   'openai-completions': 'OpenAI 兼容',
@@ -449,15 +476,38 @@ function ActionMenu({ items, label }) {
 }
 
 /** Click-to-open picker; the native <select> OS menu is replaced on purpose. */
-function SelectMenu({ value, options, onChange, disabled, ariaLabel }) {
+function SelectMenu({ value, options, onChange, disabled, ariaLabel, className, placeholder }) {
   const [open, setOpen] = React.useState(false)
   const { mounted, closing } = usePresence(open, 120)
   const rootRef = React.useRef(null)
-  const current = options.find((option) => option.value === value) || options[0]
+  const triggerRef = React.useRef(null)
+  // A popover placed by absolute coordinates inside a scrolling dialog body is
+  // clipped at the dialog's edge, so it is anchored to the viewport instead and
+  // follows the trigger's rect (measured when it opens, and on resize).
+  const [box, setBox] = React.useState(null)
+  const matched = options.find((option) => option.value === value) || null
+  const current = matched !== null ? matched : (placeholder === undefined ? options[0] : null)
+  const currentLabel = current !== null && current !== undefined ? current.label : (placeholder || '')
   const [active, setActive] = React.useState(() => Math.max(0, options.findIndex((option) => option.value === value)))
+
+  const measure = React.useCallback(() => {
+    const node = triggerRef.current
+    if (node === null || typeof window === 'undefined') return
+    const rect = node.getBoundingClientRect()
+    const width = Math.min(Math.max(rect.width, 168), Math.max(160, window.innerWidth - 16))
+    const below = window.innerHeight - rect.bottom - 12
+    const above = rect.top - 12
+    const up = below < 168 && above > below
+    const room = Math.min(Math.max(up ? above : below, 120), 264)
+    const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8))
+    setBox(up
+      ? { left, bottom: Math.max(8, window.innerHeight - rect.top + 6), width, maxHeight: room }
+      : { left, top: rect.bottom + 6, width, maxHeight: room })
+  }, [])
 
   React.useEffect(() => {
     if (!open) return undefined
+    measure()
     setActive(Math.max(0, options.findIndex((option) => option.value === value)))
     const onPointerDown = (event) => {
       if (rootRef.current !== null && !rootRef.current.contains(event.target)) setOpen(false)
@@ -468,13 +518,24 @@ function SelectMenu({ value, options, onChange, disabled, ariaLabel }) {
       event.stopPropagation()
       setOpen(false)
     }
+    // The popover follows the viewport, so an outer scroll would leave it
+    // behind; scrolling the option list itself must keep it open.
+    const onScroll = (event) => {
+      if (rootRef.current !== null && event.target instanceof Node && rootRef.current.contains(event.target)) return
+      setOpen(false)
+    }
+    const onResize = () => measure()
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onResize)
     document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('keydown', onKeyDown, true)
     return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onResize)
       document.removeEventListener('mousedown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [open, options, value])
+  }, [open, options, value, measure])
 
   const commit = (option) => {
     onChange(option.value)
@@ -482,9 +543,10 @@ function SelectMenu({ value, options, onChange, disabled, ariaLabel }) {
   }
 
   return (
-    <div className="dpp-selectMenu" ref={rootRef}>
+    <div className={className ? `dpp-selectMenu ${className}` : 'dpp-selectMenu'} ref={rootRef}>
       <button
         type="button"
+        ref={triggerRef}
         className={`dpp-selectTrigger${open ? ' is-open' : ''}`}
         disabled={disabled}
         aria-haspopup="listbox"
@@ -511,13 +573,14 @@ function SelectMenu({ value, options, onChange, disabled, ariaLabel }) {
           }
         }}
       >
-        <span className="dpp-selectValue">{current ? current.label : ''}</span>
+        <span className="dpp-selectValue">{currentLabel}</span>
         <Icon name="chevron-down" size={13} className="dpp-selectChevron" />
       </button>
-      {mounted ? (
+      {mounted && box !== null ? (
         <div
           className={`dpp-selectPopover${closing ? ' is-closing' : ''}`}
           role="listbox"
+          style={box}
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.stopPropagation()
@@ -709,7 +772,665 @@ function ModelRow({ model, index, t, disabled, onEdit, onRemove, onTest, testing
   )
 }
 
-function ModelDialog({ t, model, onSave, onCancel }) {
+// ---------------------------------------------------------------------------
+// advanced field editors
+// ---------------------------------------------------------------------------
+
+/** Translated label for one compat switch, falling back to the raw key. */
+function compatLabel(t, field) {
+  if (field === undefined) return ''
+  const label = t(field.labelKey)
+  return label === field.labelKey ? field.key : label
+}
+
+/** Two-state choice that reads better than a checkbox in a dense row. */
+function BoolToggle({ t, value, onChange, disabled }) {
+  return (
+    <div className="dpp-bool" role="group">
+      {[true, false].map((state) => (
+        <button
+          key={String(state)}
+          type="button"
+          className={`dpp-boolBtn${value === state ? ' is-on' : ''}`}
+          aria-pressed={value === state}
+          disabled={disabled}
+          onClick={() => onChange(state)}
+        >
+          {state ? t('compatOn') : t('compatOff')}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** The thinking levels a model offers: inherit the catalog, refuse them, or
+ *  spell them out one level per row. */
+function ThinkingEditor({ t, state, onChange, disabled }) {
+  const modes = [
+    { value: 'inherit', label: t('thinkingInherit') },
+    { value: 'none', label: t('thinkingNone') },
+    { value: 'custom', label: t('thinkingCustom') },
+  ]
+  const used = state.rows.map(([level]) => level)
+  const free = THINKING_LEVELS.filter((level) => !used.includes(level))
+  const setMode = (mode) => {
+    if (mode === 'custom') {
+      onChange({ mode, rows: state.rows.length > 0 ? state.rows : initialReasoningRows() })
+      return
+    }
+    onChange({ mode, rows: [] })
+  }
+  const setRow = (index, entry) => onChange({
+    ...state,
+    rows: state.rows.map((row, at) => (at === index ? entry : row)),
+  })
+  const removeRow = (index) => onChange({ ...state, rows: state.rows.filter((_, at) => at !== index) })
+  const addRow = () => {
+    if (free.length === 0) return
+    // Offer the next escalation step after the highest declared level, so a
+    // model that already speaks low/high gains "max" rather than "off".
+    const highest = used.reduce((top, level) => Math.max(top, THINKING_LEVELS.indexOf(level)), -1)
+    const next = THINKING_LEVELS.find((level, index) => index > highest && !used.includes(level)) || free[0]
+    onChange({ ...state, rows: state.rows.concat([[next, next === 'off' ? '' : next]]) })
+  }
+  const problem = reasoningProblem(state)
+
+  return (
+    <div className="dpp-thinking">
+      <SelectMenu
+        value={state.mode}
+        options={modes}
+        onChange={setMode}
+        ariaLabel={t('thinking')}
+        disabled={disabled}
+      />
+      {state.mode === 'custom' ? (
+        <div className="dpp-effList">
+          {state.rows.map(([level, wire], index) => (
+            <div className="dpp-kvRow" key={`${level}-${index}`}>
+              <SelectMenu
+                className="dpp-effLevel"
+                value={level}
+                ariaLabel={t('thinkingLevel')}
+                disabled={disabled}
+                options={THINKING_LEVELS
+                  .filter((candidate) => candidate === level || !used.includes(candidate))
+                  .map((candidate) => ({ value: candidate, label: t(levelKey(candidate)) }))}
+                onChange={(next) => setRow(index, [next, wire])}
+              />
+              <input
+                className="dpp-input dpp-inputMono"
+                value={wire}
+                placeholder={level === 'off' ? t('thinkingOffValue') : level}
+                aria-label={t('thinkingWire')}
+                disabled={disabled}
+                onChange={(event) => setRow(index, [level, event.target.value])}
+              />
+              <button
+                type="button"
+                className="dpp-iconBtn is-xs is-danger"
+                aria-label={t('remove')}
+                disabled={disabled}
+                onClick={() => removeRow(index)}
+              >
+                <Icon name="x" size={13} strokeWidth={2.2} />
+              </button>
+            </div>
+          ))}
+          {free.length > 0 ? (
+            <button type="button" className="dpp-addRow is-compact" disabled={disabled} onClick={addRow}>
+              <span className="dpp-addRowIcon" aria-hidden="true"><Icon name="plus" size={13} /></span>
+              {t('thinkingAddLevel')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {problem !== '' ? <span className="dpp-rowError">{t(problem)}</span> : null}
+    </div>
+  )
+}
+
+/** The wire-compatibility switches one protocol offers, added row by row so the
+ *  form never shows a wall of switches nobody uses. */
+function CompatEditor({ t, api, rows, onChange, disabled }) {
+  const [drafts, setDrafts] = React.useState({})
+  const fields = compatFieldsFor(api)
+  const used = new Set(rows.map(([key]) => key))
+  const remaining = fields.filter((field) => !used.has(field.key))
+  const setValue = (index, value) => onChange(rows.map((row, at) => (at === index ? [row[0], value] : row)))
+  const removeAt = (index) => onChange(rows.filter((_, at) => at !== index))
+  const add = (key) => {
+    const field = COMPAT_FIELDS[key]
+    if (field === undefined) return
+    const seed = field.kind === 'bool' ? true : field.kind === 'enum' ? field.options[0] : field.kind === 'number' ? 1 : {}
+    onChange(rows.concat([[key, seed]]))
+  }
+
+  if (fields.length === 0) return <p className="dpp-emptyNote">{t('compatUnavailable')}</p>
+
+  return (
+    <div className="dpp-kvList">
+      {rows.map(([key, value], index) => {
+        const field = COMPAT_FIELDS[key]
+        if (field === undefined) return null
+        let control = null
+        if (field.kind === 'bool') {
+          control = <BoolToggle t={t} value={value !== false} disabled={disabled} onChange={(next) => setValue(index, next)} />
+        } else if (field.kind === 'enum') {
+          control = (
+            <SelectMenu
+              value={value}
+              ariaLabel={compatLabel(t, field)}
+              disabled={disabled}
+              options={field.options.map((option) => ({ value: option, label: option }))}
+              onChange={(next) => setValue(index, next)}
+            />
+          )
+        } else if (field.kind === 'number') {
+          control = (
+            <input
+              className="dpp-input"
+              inputMode="numeric"
+              value={value === undefined || value === null ? '' : String(value)}
+              aria-label={compatLabel(t, field)}
+              disabled={disabled}
+              onChange={(event) => {
+                const parsed = Number(event.target.value)
+                setValue(index, Number.isFinite(parsed) ? parsed : 0)
+              }}
+            />
+          )
+        } else {
+          const draft = drafts[key]
+          const text = draft !== undefined ? draft : formatJsonValue(value)
+          const invalid = draft !== undefined && parseJsonValue(draft) === null
+          control = (
+            <input
+              className={invalid ? 'dpp-input dpp-inputMono is-invalid' : 'dpp-input dpp-inputMono'}
+              value={text}
+              aria-label={compatLabel(t, field)}
+              aria-invalid={invalid}
+              placeholder="{}"
+              disabled={disabled}
+              onChange={(event) => {
+                const next = event.target.value
+                setDrafts((previous) => ({ ...previous, [key]: next }))
+                const parsed = parseJsonValue(next)
+                if (parsed !== null) setValue(index, parsed === undefined ? {} : parsed)
+              }}
+              onBlur={() => {
+                if (parseJsonValue(text) === null) return
+                setDrafts((previous) => {
+                  const next = { ...previous }
+                  delete next[key]
+                  return next
+                })
+              }}
+            />
+          )
+        }
+        return (
+          <div className="dpp-kvRow" key={key}>
+            <span className="dpp-kvLabel" title={key}>{compatLabel(t, field)}</span>
+            <div className="dpp-kvValue">{control}</div>
+            <button
+              type="button"
+              className="dpp-iconBtn is-xs is-danger"
+              aria-label={t('remove')}
+              disabled={disabled}
+              onClick={() => removeAt(index)}
+            >
+              <Icon name="x" size={13} strokeWidth={2.2} />
+            </button>
+          </div>
+        )
+      })}
+      {remaining.length > 0 ? (
+        <SelectMenu
+          className="dpp-addMenu"
+          value=""
+          placeholder={t('compatAdd')}
+          ariaLabel={t('compatAdd')}
+          disabled={disabled}
+          options={remaining.map((field) => ({ value: field.key, label: compatLabel(t, field) }))}
+          onChange={add}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/** One quiet section of the advanced card. */
+function AdvancedSection({ title, children }) {
+  return (
+    <div className="dpp-advSection">
+      <span className="dpp-advLabel">{title}</span>
+      {children}
+    </div>
+  )
+}
+
+/** The route-level knobs the main card does not show: defaults, headers,
+ *  compatibility, transport and retry, image budgets, thinking budgets. */
+function AdvancedCard({ t, api, state, onChange, disabled }) {
+  const [open, setOpen] = React.useState(() => advancedCount(state) > 0)
+  const count = advancedCount(state)
+  const set = (patch) => onChange({ ...state, ...patch })
+  const clearOption = { value: '', label: t('advUnset') }
+  const options = (values, labels) => [clearOption].concat(values.map((value) => ({
+    value,
+    label: labels !== undefined && labels[value] !== undefined ? `${labels[value]} · ${value}` : value,
+  })))
+
+  return (
+    <section className="dpp-advBlock">
+      <button
+        type="button"
+        className="dpp-advHead"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} className="dpp-advChevron" />
+        <span className="dpp-advTitle">{t('advanced')}</span>
+        {count > 0 ? <span className="dpp-badge">{count}</span> : null}
+      </button>
+      {open ? (
+        <div className="dpp-advBody">
+          <AdvancedSection title={t('advDefaults')}>
+            <div className="dpp-formGrid">
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advReasoning')}</span>
+                <SelectMenu
+                  value={state.reasoning}
+                  ariaLabel={t('advReasoning')}
+                  disabled={disabled}
+                  options={[clearOption].concat(THINKING_LEVELS.map((level) => ({ value: level, label: levelLabel(t, level) })))}
+                  onChange={(next) => set({ reasoning: next })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advDefaultContext')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.defaultContextWindow}
+                  placeholder="262144"
+                  aria-label={t('advDefaultContext')}
+                  disabled={disabled}
+                  onChange={(event) => set({ defaultContextWindow: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advDefaultMaxTokens')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.defaultMaxTokens}
+                  placeholder="32768"
+                  aria-label={t('advDefaultMaxTokens')}
+                  disabled={disabled}
+                  onChange={(event) => set({ defaultMaxTokens: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advDefaultInput')}</span>
+                <div className="dpp-chipRow">
+                  {MODALITIES.map((kind) => {
+                    const on = state.defaultInput.includes(kind)
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        className={`dpp-chip${on ? ' is-on' : ''}`}
+                        aria-pressed={on}
+                        disabled={disabled}
+                        onClick={() => set({
+                          defaultInput: on
+                            ? state.defaultInput.filter((item) => item !== kind)
+                            : state.defaultInput.concat([kind]),
+                        })}
+                      >
+                        {on ? <Icon name="check" size={12} strokeWidth={2.6} /> : null}
+                        {kind === 'text' ? t('inputText') : t('inputImage')}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="dpp-field">
+              <span className="dpp-fieldLabel">{t('advThinkingBudgets')}</span>
+              <div className="dpp-budgetGrid">
+                {THINKING_BUDGET_LEVELS.map((level) => (
+                  <label className="dpp-budgetCell" key={level}>
+                    <span className="dpp-chipLabel">{level}</span>
+                    <input
+                      className="dpp-input"
+                      inputMode="numeric"
+                      value={state.thinkingBudgets[level]}
+                      aria-label={`${t('advThinkingBudgets')} ${level}`}
+                      disabled={disabled}
+                      onChange={(event) => set({
+                        thinkingBudgets: { ...state.thinkingBudgets, [level]: event.target.value },
+                      })}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </AdvancedSection>
+
+          <AdvancedSection title={t('advHeaders')}>
+            <div className="dpp-kvList">
+              {state.headers.map(([name, value], index) => (
+                <div className="dpp-kvRow" key={index}>
+                  <input
+                    className="dpp-input dpp-kvKey"
+                    value={name}
+                    placeholder={t('headerName')}
+                    aria-label={t('headerName')}
+                    disabled={disabled}
+                    onChange={(event) => set({
+                      headers: state.headers.map((row, at) => (at === index ? [event.target.value, row[1]] : row)),
+                    })}
+                  />
+                  <div className="dpp-kvValue">
+                    <input
+                      className="dpp-input"
+                      value={value}
+                      placeholder={t('headerValue')}
+                      aria-label={t('headerValue')}
+                      disabled={disabled}
+                      onChange={(event) => set({
+                        headers: state.headers.map((row, at) => (at === index ? [row[0], event.target.value] : row)),
+                      })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="dpp-iconBtn is-xs is-danger"
+                    aria-label={t('remove')}
+                    disabled={disabled}
+                    onClick={() => set({ headers: state.headers.filter((_, at) => at !== index) })}
+                  >
+                    <Icon name="x" size={13} strokeWidth={2.2} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="dpp-addRow is-compact"
+                disabled={disabled}
+                onClick={() => set({ headers: state.headers.concat([['', '']]) })}
+              >
+                <span className="dpp-addRowIcon" aria-hidden="true"><Icon name="plus" size={13} /></span>
+                {t('addHeader')}
+              </button>
+            </div>
+          </AdvancedSection>
+
+          <AdvancedSection title={t('advCompat')}>
+            <CompatEditor
+              t={t}
+              api={api}
+              rows={state.compat}
+              onChange={(rows) => set({ compat: rows })}
+              disabled={disabled}
+            />
+          </AdvancedSection>
+
+          <AdvancedSection title={t('advConnection')}>
+            <div className="dpp-formGrid">
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advTransport')}</span>
+                <SelectMenu
+                  value={state.transport}
+                  ariaLabel={t('advTransport')}
+                  disabled={disabled}
+                  options={options(TRANSPORTS)}
+                  onChange={(next) => set({ transport: next })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advCacheRetention')}</span>
+                <SelectMenu
+                  value={state.cacheRetention}
+                  ariaLabel={t('advCacheRetention')}
+                  disabled={disabled}
+                  options={options(CACHE_RETENTIONS)}
+                  onChange={(next) => set({ cacheRetention: next })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advTimeout')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.timeoutMs}
+                  aria-label={t('advTimeout')}
+                  disabled={disabled}
+                  onChange={(event) => set({ timeoutMs: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advStreamIdle')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.streamIdleTimeoutMs}
+                  placeholder="300000"
+                  aria-label={t('advStreamIdle')}
+                  disabled={disabled}
+                  onChange={(event) => set({ streamIdleTimeoutMs: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advWsConnect')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.websocketConnectTimeoutMs}
+                  aria-label={t('advWsConnect')}
+                  disabled={disabled}
+                  onChange={(event) => set({ websocketConnectTimeoutMs: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advRetry')}</span>
+                <SelectMenu
+                  value={state.retryMode}
+                  ariaLabel={t('advRetry')}
+                  disabled={disabled}
+                  options={options(RETRY_MODES, { normal: t('advRetryNormal'), always: t('advRetryAlways') })}
+                  onChange={(next) => set({ retryMode: next })}
+                />
+              </div>
+              {state.retryMode === 'normal' ? (
+                <div className="dpp-field">
+                  <span className="dpp-fieldLabel">{t('advMaxRetries')}</span>
+                  <input
+                    className="dpp-input"
+                    inputMode="numeric"
+                    value={state.maxRetries}
+                    placeholder="5"
+                    aria-label={t('advMaxRetries')}
+                    disabled={disabled}
+                    onChange={(event) => set({ maxRetries: event.target.value })}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </AdvancedSection>
+
+          <AdvancedSection title={t('advImages')}>
+            <div className="dpp-formGrid">
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advPixelBudget')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.requestImagePixelBudget}
+                  placeholder="4194304"
+                  aria-label={t('advPixelBudget')}
+                  disabled={disabled}
+                  onChange={(event) => set({ requestImagePixelBudget: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advImageMaxBytes')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.requestImageMaxBytes}
+                  placeholder="1048576"
+                  aria-label={t('advImageMaxBytes')}
+                  disabled={disabled}
+                  onChange={(event) => set({ requestImageMaxBytes: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advMaxRequestImageBytes')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.maxRequestImageBytes}
+                  placeholder="20971520"
+                  aria-label={t('advMaxRequestImageBytes')}
+                  disabled={disabled}
+                  onChange={(event) => set({ maxRequestImageBytes: event.target.value })}
+                />
+              </div>
+            </div>
+          </AdvancedSection>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+/** The built-in DeepSeek route keeps its own vocabulary: thinking mode,
+ *  reasoning effort and a few adapter-level caps that the main card omits. */
+function DeepseekAdvancedCard({ t, state, onChange, disabled }) {
+  const [open, setOpen] = React.useState(() => deepseekCount(state) > 0)
+  const count = deepseekCount(state)
+  const set = (patch) => onChange({ ...state, ...patch })
+  const clearOption = { value: '', label: t('advUnset') }
+  return (
+    <section className="dpp-advBlock">
+      <button
+        type="button"
+        className="dpp-advHead"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} className="dpp-advChevron" />
+        <span className="dpp-advTitle">{t('advanced')}</span>
+        {count > 0 ? <span className="dpp-badge">{count}</span> : null}
+      </button>
+      {open ? (
+        <div className="dpp-advBody">
+          <AdvancedSection title={t('advDefaults')}>
+            <div className="dpp-formGrid">
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advThinking')}</span>
+                <SelectMenu
+                  value={state.thinking}
+                  ariaLabel={t('advThinking')}
+                  disabled={disabled}
+                  options={[clearOption,
+                    { value: 'enabled', label: t('advThinkingOn') },
+                    { value: 'disabled', label: t('advThinkingOff') },
+                  ]}
+                  onChange={(next) => set({ thinking: next })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advReasoningEffort')}</span>
+                <SelectMenu
+                  value={state.reasoningEffort}
+                  ariaLabel={t('advReasoningEffort')}
+                  disabled={disabled}
+                  options={[clearOption].concat(DEEPSEEK_EFFORTS.map((level) => ({
+                    value: level,
+                    label: levelLabel(t, level),
+                  })))}
+                  onChange={(next) => set({ reasoningEffort: next })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advMaxTokens')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.maxTokens}
+                  aria-label={t('advMaxTokens')}
+                  disabled={disabled}
+                  onChange={(event) => set({ maxTokens: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advDefaultContext')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.defaultContextWindow}
+                  placeholder="262144"
+                  aria-label={t('advDefaultContext')}
+                  disabled={disabled}
+                  onChange={(event) => set({ defaultContextWindow: event.target.value })}
+                />
+              </div>
+            </div>
+          </AdvancedSection>
+          <AdvancedSection title={t('advConnection')}>
+            <div className="dpp-formGrid">
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advStreamIdle')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.streamIdleTimeoutMs}
+                  aria-label={t('advStreamIdle')}
+                  disabled={disabled}
+                  onChange={(event) => set({ streamIdleTimeoutMs: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advRetry')}</span>
+                <SelectMenu
+                  value={state.retryMode}
+                  ariaLabel={t('advRetry')}
+                  disabled={disabled}
+                  options={[clearOption,
+                    { value: 'normal', label: t('advRetryNormal') },
+                    { value: 'always', label: t('advRetryAlways') },
+                  ]}
+                  onChange={(next) => set({ retryMode: next })}
+                />
+              </div>
+              {state.retryMode === 'normal' ? (
+                <div className="dpp-field">
+                  <span className="dpp-fieldLabel">{t('advMaxRetries')}</span>
+                  <input
+                    className="dpp-input"
+                    inputMode="numeric"
+                    value={state.maxRetries}
+                    placeholder="5"
+                    aria-label={t('advMaxRetries')}
+                    disabled={disabled}
+                    onChange={(event) => set({ maxRetries: event.target.value })}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </AdvancedSection>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function ModelDialog({ t, model, api, showAdvanced, onSave, onCancel }) {
   const initial = {
     id: model.id || '',
     name: model.name || '',
@@ -718,6 +1439,9 @@ function ModelDialog({ t, model, onSave, onCancel }) {
     input: Array.isArray(model.input) && model.input.length > 0 ? model.input : ['text'],
   }
   const [form, setForm] = React.useState(initial)
+  const [thinking, setThinking] = React.useState(() => readReasoning(model))
+  const [compat, setCompat] = React.useState(() => readCompat(model.compat, api))
+  const [compatOpen, setCompatOpen] = React.useState(() => readCompat(model.compat, api).length > 0)
   const [error, setError] = React.useState('')
   const set = (patch) => setForm((previous) => ({ ...previous, ...patch }))
   const toggleInput = (kind) => setForm((previous) => ({
@@ -733,16 +1457,36 @@ function ModelDialog({ t, model, onSave, onCancel }) {
       setError(t('needModelId'))
       return
     }
-    const contextWindow = form.contextWindow.trim() === '' ? undefined : Number(form.contextWindow)
-    const maxTokens = form.maxTokens.trim() === '' ? undefined : Number(form.maxTokens)
-    onSave({
-      ...model,
-      id,
-      name: form.name.trim() || undefined,
-      contextWindow: Number.isFinite(contextWindow) ? contextWindow : undefined,
-      maxTokens: Number.isFinite(maxTokens) ? maxTokens : undefined,
-      input: form.input.length > 0 ? form.input : undefined,
-    })
+    const problem = reasoningProblem(thinking)
+    if (problem !== '') {
+      setError(t(problem))
+      return
+    }
+    const contextWindow = parseNumber(form.contextWindow)
+    const maxTokens = parseNumber(form.maxTokens)
+    const next = { ...model, id }
+    next.name = form.name.trim()
+    if (next.name === '') delete next.name
+    if (contextWindow === undefined) delete next.contextWindow
+    else next.contextWindow = contextWindow
+    if (maxTokens === undefined) delete next.maxTokens
+    else next.maxTokens = maxTokens
+    if (form.input.length > 0) next.input = form.input
+    else delete next.input
+    const withThinking = showAdvanced ? applyReasoning(next, thinking) : next
+    if (showAdvanced) {
+      const declared = writeCompat(compat)
+      if (declared === undefined) delete withThinking.compat
+      else withThinking.compat = declared
+    }
+    onSave(withThinking)
+  }
+
+  const reset = () => {
+    setForm(initial)
+    setThinking(readReasoning(model))
+    setCompat(readCompat(model.compat, api))
+    setError('')
   }
 
   return (
@@ -750,13 +1494,10 @@ function ModelDialog({ t, model, onSave, onCancel }) {
       open
       onClose={onCancel}
       title={t('editModel')}
+      className="dpp-modalModel"
       footer={(
         <>
-          <button
-            type="button"
-            className="dpp-btn dpp-btnGhost"
-            onClick={() => { setForm(initial); setError('') }}
-          >
+          <button type="button" className="dpp-btn dpp-btnGhost" onClick={reset}>
             {t('resetForm')}
           </button>
           <span className="dpp-footGap" />
@@ -828,6 +1569,32 @@ function ModelDialog({ t, model, onSave, onCancel }) {
           })}
         </div>
       </div>
+      {showAdvanced ? (
+        <>
+          <div className="dpp-field">
+            <span className="dpp-fieldLabel">
+              <Icon name="sparkles" size={13} className="dpp-fieldIcon" />
+              {t('thinking')}
+            </span>
+            <ThinkingEditor t={t} state={thinking} onChange={setThinking} />
+          </div>
+          <div className="dpp-advInline">
+            <button
+              type="button"
+              className="dpp-advToggle"
+              aria-expanded={compatOpen}
+              onClick={() => setCompatOpen((value) => !value)}
+            >
+              <Icon name={compatOpen ? 'chevron-down' : 'chevron-right'} size={13} />
+              {t('compat')}
+              {compat.length > 0 ? <span className="dpp-badge">{compat.length}</span> : null}
+            </button>
+            {compatOpen ? (
+              <CompatEditor t={t} api={api} rows={compat} onChange={setCompat} />
+            ) : null}
+          </div>
+        </>
+      ) : null}
       {error !== '' ? <Alert kind="err" text={error} /> : null}
     </Modal>
   )
@@ -1012,6 +1779,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
   const [data, setData] = React.useState(null)
   const [draft, setDraft] = React.useState(null)
   const [models, setModels] = React.useState([])
+  const [advanced, setAdvanced] = React.useState(null)
   const [showKey, setShowKey] = React.useState(false)
   const [keyDraft, setKeyDraft] = React.useState('')
   const [keyEditing, setKeyEditing] = React.useState(false)
@@ -1038,6 +1806,12 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
       baseURL: result.baseURL || '',
     })
     setModels((Array.isArray(result.models) ? result.models : []).map((model) => ({ ...model })))
+    const rawAdvanced = result.advanced !== null && typeof result.advanced === 'object'
+      ? result.advanced
+      : {}
+    setAdvanced(result.source === 'deepseek'
+      ? readDeepseekAdvanced(rawAdvanced)
+      : readAdvanced({ ...rawAdvanced, api: result.api }))
     setLoadError('')
   }, [])
 
@@ -1081,6 +1855,12 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     api: data.api || '',
     baseURL: data.baseURL || '',
     models: Array.isArray(data.models) ? data.models : [],
+    advanced: data.source === 'deepseek'
+      ? readDeepseekAdvanced(data.advanced)
+      : readAdvanced({
+        ...(data.advanced !== null && typeof data.advanced === 'object' ? data.advanced : {}),
+        api: data.api,
+      }),
   })), [data])
 
   const current = draft === null ? '' : JSON.stringify({
@@ -1088,6 +1868,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     api: draft.api,
     baseURL: draft.baseURL,
     models,
+    advanced,
   })
 
   const pendingKey = keyEditing && keyDraft.trim() !== '' && keyDraft !== secret
@@ -1112,6 +1893,9 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
           return next
         }),
       }
+      if (advanced !== null) {
+        patch.advanced = data !== null && isOfficial(data) ? buildDeepseekPatch(advanced) : buildAdvancedPatch(advanced)
+      }
       const nextKey = pendingKey ? keyDraft.trim() : ''
       const result = await call(
         'saveProvider',
@@ -1131,7 +1915,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     } finally {
       setBusy(false)
     }
-  }, [busy, call, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, route, t])
+  }, [advanced, busy, call, data, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, route, t])
 
   // Cmd/Ctrl+S saves from anywhere on the page.
   React.useEffect(() => {
@@ -1518,6 +2302,25 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
               testResult={testResult}
             />
           </div>
+
+          {advanced !== null ? (
+            official ? (
+              <DeepseekAdvancedCard
+                t={t}
+                state={advanced}
+                onChange={setAdvanced}
+                disabled={readOnly || busy}
+              />
+            ) : (
+              <AdvancedCard
+                t={t}
+                api={draft.api}
+                state={advanced}
+                onChange={setAdvanced}
+                disabled={readOnly || busy}
+              />
+            )
+          ) : null}
         </div>
 
         <footer className="dpp-cardFoot">
@@ -1542,6 +2345,8 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
         <ModelDialog
           t={t}
           model={editor.model}
+          api={draft.api}
+          showAdvanced={!official}
           onSave={saveEditor}
           onCancel={() => setEditor(null)}
         />
