@@ -116,17 +116,10 @@ export const ZH = {
   // 供应商：高级
   advanced: '高级',
   advUnset: '继承默认',
-  advDefaults: '默认档位',
-  advReasoning: '默认思考等级',
-  advDefaultContext: '缺省上下文',
-  advDefaultMaxTokens: '缺省输出上限',
-  advDefaultInput: '缺省输入模态',
-  advThinkingBudgets: '思考预算',
   advHeaders: '请求头',
   headerName: '名称',
   headerValue: '值',
   addHeader: '添加请求头',
-  advCompat: '兼容性',
   advConnection: '连接与重试',
   advTransport: '传输方式',
   advCacheRetention: '缓存保留',
@@ -182,6 +175,8 @@ export const ZH = {
   advMaxTokens: '输出上限',
   advMaxRequestImages: '单请求图片张数',
   advOffloadCountQuantum: '离屏回收粒度',
+  requestSettings: '请求设置',
+  advBehaviour: '思考与输出',
 
 }
 
@@ -298,17 +293,10 @@ export const EN = {
   // provider: advanced
   advanced: 'Advanced',
   advUnset: 'Inherit',
-  advDefaults: 'Defaults',
-  advReasoning: 'Default thinking level',
-  advDefaultContext: 'Default context',
-  advDefaultMaxTokens: 'Default output cap',
-  advDefaultInput: 'Default input formats',
-  advThinkingBudgets: 'Thinking budgets',
   advHeaders: 'Request headers',
   headerName: 'Name',
   headerValue: 'Value',
   addHeader: 'Add header',
-  advCompat: 'Compatibility',
   advConnection: 'Transport and retry',
   advTransport: 'Transport',
   advCacheRetention: 'Cache retention',
@@ -364,5 +352,7 @@ export const EN = {
   advMaxTokens: 'Output cap',
   advMaxRequestImages: 'Images per request',
   advOffloadCountQuantum: 'Offload count quantum',
+  requestSettings: 'Request settings',
+  advBehaviour: 'Thinking and output',
 
 }

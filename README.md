@@ -10,12 +10,12 @@
 
 **English** — A third-party settings page for DeepSeek Harness. It replaces the built-in **Models** panel and edits the `llm-pi-ai` provider configuration directly: browse providers, reveal / replace / clear API keys, and manage models without hand-editing `cordis.patch.yml`.
 
-DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字段，保存时会丢掉模型上未声明的配置，API 密钥也只写不回显。这个插件在设置面板里另开一页「供应商管理」，直接读写 `llm-pi-ai.providers` 和 DSH 凭据服务：一级是供应商列表，二级是所选供应商的编辑页；密钥可显示、复制、更换、清除，模型可增删改并做真实连通性测试。pi-ai 支持的参数在这里都能配：模型的思考等级与兼容开关、路由默认档位、请求头、传输与重试、图片预算，全部落地到配置文件。
+DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字段，保存时会丢掉模型上未声明的配置，API 密钥也只写不回显。这个插件在设置面板里另开一页「供应商管理」，直接读写 `llm-pi-ai.providers` 和 DSH 凭据服务：一级是供应商列表，二级是所选供应商的编辑页；密钥可显示、复制、更换、清除，模型可增删改并做真实连通性测试。参数按归属分开：模型自己的思考等级与兼容开关在模型弹窗里，供应商自己的请求头、传输与重试、图片预算在供应商页里，都直接落到配置文件。
 
 ## 特点
 
 - **密钥真的能看见**：官方页只写不回显；这里默认掩码，点一下就能显示、复制、更换、清除。
-- **参数不止能保住，还能改**：直接解析 profile 里的原始配置而不是 schema 投影；模型的 `reasoningEfforts`（思考等级）与 `compat`（兼容开关）、路由的默认档位 / 请求头 / 传输与重试 / 图片预算都在界面上有对应控件，保存时落到原字段。
+- **参数不止能保住，还能改**：直接解析 profile 里的原始配置而不是 schema 投影；模型自己的 `reasoningEfforts`（思考等级）与 `compat`（兼容开关）放在模型弹窗里，供应商自己的请求头 / 传输与重试 / 图片预算放在供应商页里，各归各位。
 - **一个页面管完**：供应商、Base URL、协议、密钥、模型增删改、单模型连通性测试、从端点批量拉取模型，不用再手改 `cordis.patch.yml`。
 - **新增供应商不用查文档**：内置 models.dev 全量目录里的 223 个模板（常用 / 国内 / 海外 / 网关），带品牌 logo；选一下就把 Base URL、协议、环境变量名填好。
 - **交互不将就**：就地改名、`…` 菜单、二次确认、未保存拦截、`Cmd/Ctrl+S`、右下角 Toast；Lucide 图标 + 统一动效，深色/浅色都可用。
@@ -27,8 +27,8 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 |:---:|:---:|
 | ![供应商列表](docs/list.png)<br>供应商列表：只显示名字，点进二级页 | ![供应商详情](docs/detail.png)<br>供应商详情：URL、协议、密钥、模型一页管完 |
 | ![模板选择器](docs/templates.png)<br>模板选择器：223 个模板带品牌 logo | ![拉取模型](docs/discover.png)<br>拉取模型：搜索、全选、批量加入 |
-| ![编辑模型](docs/model-dialog.png)<br>编辑模型：上下文、输出上限、输入模态与思考等级 | ![兼容开关](docs/model-compat.png)<br>兼容开关：按协议列出可覆盖字段，逐项开关 |
-| ![高级参数](docs/advanced.png)<br>高级参数：默认档位、请求头、兼容性、传输与重试 | ![协议选择](docs/select.png)<br>协议选择：自绘下拉，不调系统菜单 |
+| ![编辑模型](docs/model-dialog.png)<br>编辑模型：基础字段 + 模型自己的高级（思考等级） | ![兼容开关](docs/model-compat.png)<br>模型高级里的兼容开关：按协议列出可覆盖字段 |
+| ![请求设置](docs/request-settings.png)<br>请求设置：请求头、传输与重试、图片预算 | ![协议选择](docs/select.png)<br>协议选择：自绘下拉，不调系统菜单 |
 
 保存结果以右下角提示呈现，不打断当前页面：
 
@@ -159,31 +159,26 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 
 点模型 ID 或铅笔图标打开弹窗：模型 ID、显示名、上下文窗口、最大输出、输入模态（文本 / 图片），可以重置表单。删除模型只改草稿，保存后才生效。
 
-### 配置思考等级
+### 模型的高级参数
 
-弹窗里的「思考能力」三选一：
+模型弹窗里，「输入模态」下面是**模型的**「高级」，默认收起（模型已经声明过思考等级或兼容开关时自动展开），标题旁的数字表示当前覆盖了几项。里面只有模型自己的东西：
 
-- **继承内置目录**（默认）：不在配置里声明，交给 pi-ai 的模型目录决定；
-- **不支持思考**：写入 `reasoningEfforts: false`，明确声明这是非推理模型；
-- **自定义等级**：一条一条声明「等级 → 实际发送值」，例如 `低 / low`、`最高 / max`；`关` 的发送值可以留空。
+- **思考能力**（`reasoningEfforts`）三选一：
+  - **继承内置目录**（默认）：不在配置里声明，交给 pi-ai 的模型目录决定；
+  - **不支持思考**：写入 `reasoningEfforts: false`，明确声明这是非推理模型；
+  - **自定义等级**：一条一条声明「等级 → 实际发送值」，例如 `低 / low`、`最高 / max`；`关` 的发送值可以留空。
+  「添加等级」会按升级顺序补下一个档位（已有 low/medium/high 时补 `max`）。至少要保留一个 `off` 以外的等级，否则保存会被拦下并提示。
+- **兼容开关**（`compat`）：可选字段随协议变化——OpenAI 兼容 19 项（`thinkingFormat`、`maxTokensField`、`chat_template_kwargs` 等）、Responses 4 项、Anthropic 7 项；每项是开关或枚举下拉，不设置就交给 pi-ai 自动判断。
 
-「添加等级」会按升级顺序补下一个档位（已有 low/medium/high 时补 `max`）。至少要保留一个 `off` 以外的等级，否则保存会被拦下并提示。
+### 供应商的请求设置
 
-### 兼容开关
+供应商详情页模型表下面是**供应商自己的**「请求设置」，和模型参数完全分开；默认收起，标题上的数字表示当前覆盖了多少项：
 
-弹窗下半部分「兼容性」默认收起，只在端点与协议不完全一致时才需要动。可选字段随协议变化：OpenAI 兼容 19 项（`thinkingFormat`、`maxTokensField`、`chat_template_kwargs` 等）、Responses 4 项、Anthropic 7 项；每项是开关或枚举下拉，不设置就交给 pi-ai 自动判断。
-
-### 高级参数（供应商级）
-
-详情页模型表下面是「高级」，默认收起，标题上的数字表示当前覆盖了多少项：
-
-- **默认档位**：默认思考等级、缺省上下文、缺省输出上限、缺省输入模态、思考预算；
 - **请求头**：自定义 HTTP 头，网关做鉴权 / 路由时常用；
-- **兼容性**：路由级 `compat`，对整条路由生效；
 - **连接与重试**：传输方式（auto / sse / websocket…）、缓存保留、请求超时、流空闲超时、WebSocket 连接超时、重试策略与次数；
 - **图片预算**：单图像素预算、单图字节上限、请求图片总量、单请求图片张数、离屏回收粒度。
 
-内置 **DeepSeek 官方**行有自己的一组参数：思考模式、推理等级、输出上限、缺省上下文、流空闲超时、重试策略。
+内置 **DeepSeek 官方**行是 llm-deepseek 自己的词汇，也有一个只属于它的高级区：思考模式、推理等级、输出上限、流空闲超时、重试策略。
 
 ### 重命名 / 删除供应商
 
@@ -225,17 +220,24 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 ### 模型
 
 - 模型表一行一个模型：模型 ID、上下文窗口徽章、视觉能力徽章，以及测试 / 编辑 / 删除三个动作。
-- 编辑走弹窗：模型 ID、显示名、上下文窗口、最大输出、输入模态（文本 / 图片）、思考等级、兼容开关，支持重置表单。
+- 编辑走弹窗：基础字段（模型 ID、显示名、上下文窗口、最大输出、输入模态）+ 模型自己的「高级」（思考等级、兼容开关），支持重置表单。
 - pi-ai 的模型字段全都在界面上：`name`、`contextWindow`、`maxTokens`、`input`、`reasoningEfforts`、`compat`。
 - **测试是真实请求**：Host 按该供应商协议向端点发一个最小请求（聊天类 `max_tokens: 1`，Responses 类 `max_output_tokens: 16`），20 秒超时，返回 `✓ 延迟` 或具体的 HTTP 错误。
 - 页面内部的 `input` 与 DSH 的 `inputModalities` 在边界互相转换；内置 DeepSeek 的模型条目使用它自己的词汇（`inputModalities`），不套用 pi-ai 字段。
 
-### 高级参数
+### 参数的分层
 
-- 收在详情页的「高级」里，展开后按组呈现，未设置的项一律留空（= 沿用 pi-ai 默认），设置过的项在折叠时计入标题旁的数字。
-- 路由级 `compat` 与模型级 `compat` 是两层：模型上的覆盖优先级更高。界面按当前协议过滤可选项，换了协议不会把旧协议的开关偷偷写回去。
+界面按「谁的东西放谁那儿」切开，两边互不串：
+
+| 位置 | 只管 | 字段 |
+|---|---|---|
+| 模型弹窗 →「高级」 | 模型自己 | `reasoningEfforts`、`compat` |
+| 供应商详情 →「请求设置」 | 供应商自己的连接与请求 | `headers`、`transport`、`cacheRetention`、`timeoutMs`、`streamIdleTimeoutMs`、`websocketConnectTimeoutMs`、`retryPolicy`、`requestImagePixelBudget`、`requestImageMaxBytes`、`maxRequestImageBytes`、`maxRequestImages`、`imageOffloadCountQuantum` |
+
+- 未设置的项一律留空（= 沿用 pi-ai 默认），设置过的项在折叠时计入标题旁的数字。
+- 模型级 `compat` 按当前协议过滤可选项，换了协议不会把旧协议的开关偷偷写回去；保存时 Host 再按 pi-ai 的规则校验一遍。
 - 所有数值字段按 pi-ai 的约束校验（正整数、枚举取值、`retryPolicy.mode` 必填），不合法的值在保存时直接报错。
-- 支持的字段：`headers`、`compat`、`reasoning`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`thinkingBudgets`、`transport`、`cacheRetention`、`timeoutMs`、`streamIdleTimeoutMs`、`websocketConnectTimeoutMs`、`maxRequestImageBytes`、`requestImagePixelBudget`、`requestImageMaxBytes`、`maxRequestImages`、`imageOffloadCountQuantum`、`retryPolicy`。其中 `maxRequestImages` / `imageOffloadCountQuantum` 是 DSH `0.2.2` 才有的字段，旧版本里留空即可。
+- 路由级的模型缺省值（`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`reasoning`、`thinkingBudgets`）和 `modelOverrides` 没有进界面：它们只在「模型自己什么都没声明」时兜底，正常配置走模型自己的字段即可；确实需要时手写 `cordis.patch.yml`。
 
 ### 从端点拉取模型
 
@@ -306,7 +308,7 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 - Host 端改动必须重启 DSH 才生效（见「安装」）。
 - 只管理 `llm-pi-ai` 的供应商（外加内置 `llm-deepseek`）；不支持需要专用 SDK 的协议。
 - 新建供应商至少要有一个模型条目。删除供应商、清除密钥、放弃未保存修改都会先弹出二次确认。
-- `modelOverrides` 还没有界面：使用内置目录的路由（没有写 `models` 列表）只能整体继承目录，想只改其中一个模型的档位需要手写 `cordis.patch.yml`。
+- 路由级兜底字段（`defaultContextWindow` / `defaultMaxTokens` / `defaultInput` / `reasoning` / `thinkingBudgets`）和 `modelOverrides` 没有界面，需要时手写 `cordis.patch.yml`；日常配置用模型自己的字段就够。
 - 模板与模型 ID 只是预填建议，不代表账户一定有权限调用。
 - 按 DSH `0.2.1-rc.5` / `0.2.2-rc.1` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配（例如 `0.2.2` 新增的两个图片字段只在 `0.2.2+` 生效）。
 

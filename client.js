@@ -2968,21 +2968,12 @@ window.__ModuleLoader__.load({
     }
     var TRANSPORTS = ["auto", "sse", "websocket", "websocket-cached"];
     var CACHE_RETENTIONS = ["none", "short", "long"];
-    var RETRY_MODES = ["normal", "always"];
-    var MODALITIES = ["text", "image"];
-    var THINKING_BUDGET_LEVELS = ["minimal", "low", "medium", "high"];
-    function readAdvanced(profile) {
+    function readRequestSettings(profile) {
       const source = profile !== null && typeof profile === "object" ? profile : {};
       const headers = source.headers !== null && typeof source.headers === "object" ? Object.entries(source.headers).map(([key, value]) => [key, String(value)]) : [];
       const retry = source.retryPolicy !== null && typeof source.retryPolicy === "object" ? source.retryPolicy : {};
-      const budgets = source.thinkingBudgets !== null && typeof source.thinkingBudgets === "object" ? source.thinkingBudgets : {};
       return {
         headers,
-        compat: readCompat(source.compat, source.api),
-        reasoning: typeof source.reasoning === "string" ? source.reasoning : "",
-        defaultContextWindow: numberText(source.defaultContextWindow),
-        defaultMaxTokens: numberText(source.defaultMaxTokens),
-        defaultInput: Array.isArray(source.defaultInput) ? source.defaultInput : [],
         transport: typeof source.transport === "string" ? source.transport : "",
         cacheRetention: typeof source.cacheRetention === "string" ? source.cacheRetention : "",
         timeoutMs: numberText(source.timeoutMs),
@@ -2994,26 +2985,19 @@ window.__ModuleLoader__.load({
         maxRequestImages: numberText(source.maxRequestImages),
         imageOffloadCountQuantum: numberText(source.imageOffloadCountQuantum),
         retryMode: typeof retry.mode === "string" ? retry.mode : "",
-        maxRetries: numberText(retry.maxRetries),
-        thinkingBudgets: Object.fromEntries(
-          THINKING_BUDGET_LEVELS.map((level) => [level, numberText(budgets[level])])
-        )
+        maxRetries: numberText(retry.maxRetries)
       };
     }
     function numberText(value) {
       return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
     }
-    function advancedCount(state) {
+    function requestCount(state) {
       if (state === void 0 || state === null) return 0;
-      let count = state.headers.length + state.compat.length;
-      if (state.reasoning !== "") count += 1;
+      let count = state.headers.length;
       if (state.transport !== "") count += 1;
       if (state.cacheRetention !== "") count += 1;
       if (state.retryMode !== "" || state.maxRetries !== "") count += 1;
-      if (state.defaultInput.length > 0) count += 1;
       for (const field of [
-        "defaultContextWindow",
-        "defaultMaxTokens",
         "timeoutMs",
         "websocketConnectTimeoutMs",
         "streamIdleTimeoutMs",
@@ -3025,10 +3009,9 @@ window.__ModuleLoader__.load({
       ]) {
         if (state[field] !== "") count += 1;
       }
-      if (THINKING_BUDGET_LEVELS.some((level) => state.thinkingBudgets[level] !== "")) count += 1;
       return count;
     }
-    function buildAdvancedPatch(state) {
+    function buildRequestPatch(state) {
       const patch = {};
       const headers = {};
       for (const [name2, value] of state.headers) {
@@ -3037,14 +3020,9 @@ window.__ModuleLoader__.load({
         headers[key] = String(value);
       }
       patch.headers = Object.keys(headers).length > 0 ? headers : null;
-      patch.compat = state.compat.length > 0 ? Object.fromEntries(state.compat) : null;
-      patch.reasoning = state.reasoning === "" ? null : state.reasoning;
-      patch.defaultInput = state.defaultInput.length > 0 ? state.defaultInput : null;
       patch.transport = state.transport === "" ? null : state.transport;
       patch.cacheRetention = state.cacheRetention === "" ? null : state.cacheRetention;
       for (const field of [
-        "defaultContextWindow",
-        "defaultMaxTokens",
         "timeoutMs",
         "websocketConnectTimeoutMs",
         "streamIdleTimeoutMs",
@@ -3056,12 +3034,6 @@ window.__ModuleLoader__.load({
       ]) {
         patch[field] = positiveNumber(state[field]);
       }
-      const budgets = {};
-      for (const level of THINKING_BUDGET_LEVELS) {
-        const value = positiveNumber(state.thinkingBudgets[level]);
-        if (typeof value === "number") budgets[level] = value;
-      }
-      patch.thinkingBudgets = Object.keys(budgets).length > 0 ? budgets : null;
       if (state.retryMode === "") {
         patch.retryPolicy = null;
       } else {
@@ -3090,7 +3062,6 @@ window.__ModuleLoader__.load({
         thinking: typeof source.thinking === "string" ? source.thinking : "",
         reasoningEffort: typeof source.reasoningEffort === "string" ? source.reasoningEffort : "",
         maxTokens: numberText(source.maxTokens),
-        defaultContextWindow: numberText(source.defaultContextWindow),
         streamIdleTimeoutMs: numberText(source.streamIdleTimeoutMs),
         retryMode: typeof retry.mode === "string" ? retry.mode : "",
         maxRetries: numberText(retry.maxRetries)
@@ -3102,7 +3073,6 @@ window.__ModuleLoader__.load({
       if (state.thinking !== "") count += 1;
       if (state.reasoningEffort !== "") count += 1;
       if (state.maxTokens !== "") count += 1;
-      if (state.defaultContextWindow !== "") count += 1;
       if (state.streamIdleTimeoutMs !== "") count += 1;
       if (state.retryMode !== "" || state.maxRetries !== "") count += 1;
       return count;
@@ -3112,7 +3082,6 @@ window.__ModuleLoader__.load({
         thinking: state.thinking === "" ? null : state.thinking,
         reasoningEffort: state.reasoningEffort === "" ? null : state.reasoningEffort,
         maxTokens: positiveNumber(state.maxTokens),
-        defaultContextWindow: positiveNumber(state.defaultContextWindow),
         streamIdleTimeoutMs: positiveNumber(state.streamIdleTimeoutMs)
       };
       if (state.retryMode === "") {
@@ -3848,15 +3817,12 @@ window.__ModuleLoader__.load({
     function AdvancedSection({ title, children }) {
       return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advSection" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-advLabel" }, title), children);
     }
-    function AdvancedCard({ t, api, state, onChange, disabled }) {
-      const [open, setOpen] = import_react2.default.useState(() => advancedCount(state) > 0);
-      const count = advancedCount(state);
+    function RequestCard({ t, state, onChange, disabled }) {
+      const [open, setOpen] = import_react2.default.useState(() => requestCount(state) > 0);
+      const count = requestCount(state);
       const set = (patch) => onChange({ ...state, ...patch });
       const clearOption = { value: "", label: t("advUnset") };
-      const options = (values, labels) => [clearOption].concat(values.map((value) => ({
-        value,
-        label: labels !== void 0 && labels[value] !== void 0 ? `${labels[value]} \xB7 ${value}` : value
-      })));
+      const options = (values) => [clearOption].concat(values.map((value) => ({ value, label: value })));
       return /* @__PURE__ */ import_react2.default.createElement("section", { className: "dpp-advBlock" }, /* @__PURE__ */ import_react2.default.createElement(
         "button",
         {
@@ -3866,69 +3832,9 @@ window.__ModuleLoader__.load({
           onClick: () => setOpen((value) => !value)
         },
         /* @__PURE__ */ import_react2.default.createElement(Icon, { name: open ? "chevron-down" : "chevron-right", size: 14, className: "dpp-advChevron" }),
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-advTitle" }, t("advanced")),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-advTitle" }, t("requestSettings")),
         count > 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge" }, count) : null
-      ), open ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advBody" }, /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advDefaults") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advReasoning")), /* @__PURE__ */ import_react2.default.createElement(
-        SelectMenu,
-        {
-          value: state.reasoning,
-          ariaLabel: t("advReasoning"),
-          disabled,
-          options: [clearOption].concat(THINKING_LEVELS.map((level) => ({ value: level, label: levelLabel(t, level) }))),
-          onChange: (next) => set({ reasoning: next })
-        }
-      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultContext")), /* @__PURE__ */ import_react2.default.createElement(
-        "input",
-        {
-          className: "dpp-input",
-          inputMode: "numeric",
-          value: state.defaultContextWindow,
-          placeholder: "262144",
-          "aria-label": t("advDefaultContext"),
-          disabled,
-          onChange: (event) => set({ defaultContextWindow: event.target.value })
-        }
-      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultMaxTokens")), /* @__PURE__ */ import_react2.default.createElement(
-        "input",
-        {
-          className: "dpp-input",
-          inputMode: "numeric",
-          value: state.defaultMaxTokens,
-          placeholder: "32768",
-          "aria-label": t("advDefaultMaxTokens"),
-          disabled,
-          onChange: (event) => set({ defaultMaxTokens: event.target.value })
-        }
-      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultInput")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-chipRow" }, MODALITIES.map((kind) => {
-        const on = state.defaultInput.includes(kind);
-        return /* @__PURE__ */ import_react2.default.createElement(
-          "button",
-          {
-            key: kind,
-            type: "button",
-            className: `dpp-chip${on ? " is-on" : ""}`,
-            "aria-pressed": on,
-            disabled,
-            onClick: () => set({
-              defaultInput: on ? state.defaultInput.filter((item) => item !== kind) : state.defaultInput.concat([kind])
-            })
-          },
-          on ? /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "check", size: 12, strokeWidth: 2.6 }) : null,
-          kind === "text" ? t("inputText") : t("inputImage")
-        );
-      })))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advThinkingBudgets")), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-budgetGrid" }, THINKING_BUDGET_LEVELS.map((level) => /* @__PURE__ */ import_react2.default.createElement("label", { className: "dpp-budgetCell", key: level }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-chipLabel" }, level), /* @__PURE__ */ import_react2.default.createElement(
-        "input",
-        {
-          className: "dpp-input",
-          inputMode: "numeric",
-          value: state.thinkingBudgets[level],
-          "aria-label": `${t("advThinkingBudgets")} ${level}`,
-          disabled,
-          onChange: (event) => set({
-            thinkingBudgets: { ...state.thinkingBudgets, [level]: event.target.value }
-          })
-        }
-      )))))), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advHeaders") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvList" }, state.headers.map(([name2, value], index) => /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvRow", key: index }, /* @__PURE__ */ import_react2.default.createElement(
+      ), open ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advBody" }, /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advHeaders") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvList" }, state.headers.map(([name2, value], index) => /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-kvRow", key: index }, /* @__PURE__ */ import_react2.default.createElement(
         "input",
         {
           className: "dpp-input dpp-kvKey",
@@ -3972,16 +3878,7 @@ window.__ModuleLoader__.load({
         },
         /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-addRowIcon", "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "plus", size: 13 })),
         t("addHeader")
-      ))), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advCompat") }, /* @__PURE__ */ import_react2.default.createElement(
-        CompatEditor,
-        {
-          t,
-          api,
-          rows: state.compat,
-          onChange: (rows) => set({ compat: rows }),
-          disabled
-        }
-      )), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advConnection") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advTransport")), /* @__PURE__ */ import_react2.default.createElement(
+      ))), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advConnection") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advTransport")), /* @__PURE__ */ import_react2.default.createElement(
         SelectMenu,
         {
           value: state.transport,
@@ -4036,7 +3933,11 @@ window.__ModuleLoader__.load({
           value: state.retryMode,
           ariaLabel: t("advRetry"),
           disabled,
-          options: options(RETRY_MODES, { normal: t("advRetryNormal"), always: t("advRetryAlways") }),
+          options: [
+            clearOption,
+            { value: "normal", label: t("advRetryNormal") },
+            { value: "always", label: t("advRetryAlways") }
+          ],
           onChange: (next) => set({ retryMode: next })
         }
       )), state.retryMode === "normal" ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advMaxRetries")), /* @__PURE__ */ import_react2.default.createElement(
@@ -4122,7 +4023,7 @@ window.__ModuleLoader__.load({
         /* @__PURE__ */ import_react2.default.createElement(Icon, { name: open ? "chevron-down" : "chevron-right", size: 14, className: "dpp-advChevron" }),
         /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-advTitle" }, t("advanced")),
         count > 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge" }, count) : null
-      ), open ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advBody" }, /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advDefaults") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advThinking")), /* @__PURE__ */ import_react2.default.createElement(
+      ), open ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advBody" }, /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advBehaviour") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advThinking")), /* @__PURE__ */ import_react2.default.createElement(
         SelectMenu,
         {
           value: state.thinking,
@@ -4156,17 +4057,6 @@ window.__ModuleLoader__.load({
           "aria-label": t("advMaxTokens"),
           disabled,
           onChange: (event) => set({ maxTokens: event.target.value })
-        }
-      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advDefaultContext")), /* @__PURE__ */ import_react2.default.createElement(
-        "input",
-        {
-          className: "dpp-input",
-          inputMode: "numeric",
-          value: state.defaultContextWindow,
-          placeholder: "262144",
-          "aria-label": t("advDefaultContext"),
-          disabled,
-          onChange: (event) => set({ defaultContextWindow: event.target.value })
         }
       )))), /* @__PURE__ */ import_react2.default.createElement(AdvancedSection, { title: t("advConnection") }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advStreamIdle")), /* @__PURE__ */ import_react2.default.createElement(
         "input",
@@ -4215,7 +4105,7 @@ window.__ModuleLoader__.load({
       const [form, setForm] = import_react2.default.useState(initial);
       const [thinking, setThinking] = import_react2.default.useState(() => readReasoning(model));
       const [compat, setCompat] = import_react2.default.useState(() => readCompat(model.compat, api));
-      const [compatOpen, setCompatOpen] = import_react2.default.useState(() => readCompat(model.compat, api).length > 0);
+      const [advancedOpen, setAdvancedOpen] = import_react2.default.useState(() => readCompat(model.compat, api).length > 0 || readReasoning(model).mode !== "inherit");
       const [error, setError] = import_react2.default.useState("");
       const set = (patch) => setForm((previous) => ({ ...previous, ...patch }));
       const toggleInput = (kind) => setForm((previous) => ({
@@ -4246,9 +4136,9 @@ window.__ModuleLoader__.load({
         else delete next.input;
         const withThinking = showAdvanced ? applyReasoning(next, thinking) : next;
         if (showAdvanced) {
-          const declared = writeCompat(compat);
-          if (declared === void 0) delete withThinking.compat;
-          else withThinking.compat = declared;
+          const declared2 = writeCompat(compat);
+          if (declared2 === void 0) delete withThinking.compat;
+          else withThinking.compat = declared2;
         }
         onSave(withThinking);
       };
@@ -4258,6 +4148,7 @@ window.__ModuleLoader__.load({
         setCompat(readCompat(model.compat, api));
         setError("");
       };
+      const declared = (thinking.mode === "inherit" ? 0 : 1) + (compat.length > 0 ? 1 : 0);
       return /* @__PURE__ */ import_react2.default.createElement(
         Modal,
         {
@@ -4327,18 +4218,18 @@ window.__ModuleLoader__.load({
             item.label
           );
         }))),
-        showAdvanced ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "sparkles", size: 13, className: "dpp-fieldIcon" }), t("thinking")), /* @__PURE__ */ import_react2.default.createElement(ThinkingEditor, { t, state: thinking, onChange: setThinking })), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advInline" }, /* @__PURE__ */ import_react2.default.createElement(
+        showAdvanced ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-modelAdvanced" }, /* @__PURE__ */ import_react2.default.createElement(
           "button",
           {
             type: "button",
             className: "dpp-advToggle",
-            "aria-expanded": compatOpen,
-            onClick: () => setCompatOpen((value) => !value)
+            "aria-expanded": advancedOpen,
+            onClick: () => setAdvancedOpen((value) => !value)
           },
-          /* @__PURE__ */ import_react2.default.createElement(Icon, { name: compatOpen ? "chevron-down" : "chevron-right", size: 13 }),
-          t("compat"),
-          compat.length > 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge" }, compat.length) : null
-        ), compatOpen ? /* @__PURE__ */ import_react2.default.createElement(CompatEditor, { t, api, rows: compat, onChange: setCompat }) : null)) : null,
+          /* @__PURE__ */ import_react2.default.createElement(Icon, { name: advancedOpen ? "chevron-down" : "chevron-right", size: 13 }),
+          t("advanced"),
+          declared !== 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge" }, declared) : null
+        ), advancedOpen ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-advPanel" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "sparkles", size: 13, className: "dpp-fieldIcon" }), t("thinking")), /* @__PURE__ */ import_react2.default.createElement(ThinkingEditor, { t, state: thinking, onChange: setThinking })), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("compat")), /* @__PURE__ */ import_react2.default.createElement(CompatEditor, { t, api, rows: compat, onChange: setCompat }))) : null) : null,
         error !== "" ? /* @__PURE__ */ import_react2.default.createElement(Alert, { kind: "err", text: error }) : null
       );
     }
@@ -4447,7 +4338,7 @@ window.__ModuleLoader__.load({
       const [data, setData] = import_react2.default.useState(null);
       const [draft, setDraft] = import_react2.default.useState(null);
       const [models, setModels] = import_react2.default.useState([]);
-      const [advanced, setAdvanced] = import_react2.default.useState(null);
+      const [request, setRequest] = import_react2.default.useState(null);
       const [showKey, setShowKey] = import_react2.default.useState(false);
       const [keyDraft, setKeyDraft] = import_react2.default.useState("");
       const [keyEditing, setKeyEditing] = import_react2.default.useState(false);
@@ -4473,7 +4364,7 @@ window.__ModuleLoader__.load({
         });
         setModels((Array.isArray(result.models) ? result.models : []).map((model) => ({ ...model })));
         const rawAdvanced = result.advanced !== null && typeof result.advanced === "object" ? result.advanced : {};
-        setAdvanced(result.source === "deepseek" ? readDeepseekAdvanced(rawAdvanced) : readAdvanced({ ...rawAdvanced, api: result.api }));
+        setRequest(result.source === "deepseek" ? readDeepseekAdvanced(rawAdvanced) : readRequestSettings(rawAdvanced));
         setLoadError("");
       }, []);
       const load = import_react2.default.useCallback(async () => {
@@ -4510,17 +4401,14 @@ window.__ModuleLoader__.load({
         api: data.api || "",
         baseURL: data.baseURL || "",
         models: Array.isArray(data.models) ? data.models : [],
-        advanced: data.source === "deepseek" ? readDeepseekAdvanced(data.advanced) : readAdvanced({
-          ...data.advanced !== null && typeof data.advanced === "object" ? data.advanced : {},
-          api: data.api
-        })
+        request: data.source === "deepseek" ? readDeepseekAdvanced(data.advanced) : readRequestSettings(data.advanced)
       }), [data]);
       const current = draft === null ? "" : JSON.stringify({
         displayName: draft.displayName,
         api: draft.api,
         baseURL: draft.baseURL,
         models,
-        advanced
+        request
       });
       const pendingKey = keyEditing && keyDraft.trim() !== "" && keyDraft !== secret;
       const dirty = baseline !== "" && (baseline !== current || pendingKey);
@@ -4543,8 +4431,8 @@ window.__ModuleLoader__.load({
               return next;
             })
           };
-          if (advanced !== null) {
-            patch.advanced = data !== null && isOfficial(data) ? buildDeepseekPatch(advanced) : buildAdvancedPatch(advanced);
+          if (request !== null) {
+            patch.advanced = data !== null && isOfficial(data) ? buildDeepseekPatch(request) : buildRequestPatch(request);
           }
           const nextKey = pendingKey ? keyDraft.trim() : "";
           const result = await call(
@@ -4565,7 +4453,7 @@ window.__ModuleLoader__.load({
         } finally {
           setBusy(false);
         }
-      }, [advanced, busy, call, data, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, route, t]);
+      }, [busy, call, data, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, request, route, t]);
       import_react2.default.useEffect(() => {
         const onKeyDown = (event) => {
           if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
@@ -4882,21 +4770,20 @@ window.__ModuleLoader__.load({
           testing,
           testResult
         }
-      )), advanced !== null ? official ? /* @__PURE__ */ import_react2.default.createElement(
+      )), request !== null ? official ? /* @__PURE__ */ import_react2.default.createElement(
         DeepseekAdvancedCard,
         {
           t,
-          state: advanced,
-          onChange: setAdvanced,
+          state: request,
+          onChange: setRequest,
           disabled: readOnly || busy
         }
       ) : /* @__PURE__ */ import_react2.default.createElement(
-        AdvancedCard,
+        RequestCard,
         {
           t,
-          api: draft.api,
-          state: advanced,
-          onChange: setAdvanced,
+          state: request,
+          onChange: setRequest,
           disabled: readOnly || busy
         }
       ) : null), /* @__PURE__ */ import_react2.default.createElement("footer", { className: "dpp-cardFoot" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-dirty${dirtyNow ? " is-on" : ""}` }, dirtyNow ? t("unsaved") : ""), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: () => {
@@ -5817,17 +5704,10 @@ window.__ModuleLoader__.load({
       // 供应商：高级
       advanced: "\u9AD8\u7EA7",
       advUnset: "\u7EE7\u627F\u9ED8\u8BA4",
-      advDefaults: "\u9ED8\u8BA4\u6863\u4F4D",
-      advReasoning: "\u9ED8\u8BA4\u601D\u8003\u7B49\u7EA7",
-      advDefaultContext: "\u7F3A\u7701\u4E0A\u4E0B\u6587",
-      advDefaultMaxTokens: "\u7F3A\u7701\u8F93\u51FA\u4E0A\u9650",
-      advDefaultInput: "\u7F3A\u7701\u8F93\u5165\u6A21\u6001",
-      advThinkingBudgets: "\u601D\u8003\u9884\u7B97",
       advHeaders: "\u8BF7\u6C42\u5934",
       headerName: "\u540D\u79F0",
       headerValue: "\u503C",
       addHeader: "\u6DFB\u52A0\u8BF7\u6C42\u5934",
-      advCompat: "\u517C\u5BB9\u6027",
       advConnection: "\u8FDE\u63A5\u4E0E\u91CD\u8BD5",
       advTransport: "\u4F20\u8F93\u65B9\u5F0F",
       advCacheRetention: "\u7F13\u5B58\u4FDD\u7559",
@@ -5882,7 +5762,9 @@ window.__ModuleLoader__.load({
       advReasoningEffort: "\u63A8\u7406\u7B49\u7EA7",
       advMaxTokens: "\u8F93\u51FA\u4E0A\u9650",
       advMaxRequestImages: "\u5355\u8BF7\u6C42\u56FE\u7247\u5F20\u6570",
-      advOffloadCountQuantum: "\u79BB\u5C4F\u56DE\u6536\u7C92\u5EA6"
+      advOffloadCountQuantum: "\u79BB\u5C4F\u56DE\u6536\u7C92\u5EA6",
+      requestSettings: "\u8BF7\u6C42\u8BBE\u7F6E",
+      advBehaviour: "\u601D\u8003\u4E0E\u8F93\u51FA"
     };
     var EN = {
       nav: "Providers",
@@ -5997,17 +5879,10 @@ window.__ModuleLoader__.load({
       // provider: advanced
       advanced: "Advanced",
       advUnset: "Inherit",
-      advDefaults: "Defaults",
-      advReasoning: "Default thinking level",
-      advDefaultContext: "Default context",
-      advDefaultMaxTokens: "Default output cap",
-      advDefaultInput: "Default input formats",
-      advThinkingBudgets: "Thinking budgets",
       advHeaders: "Request headers",
       headerName: "Name",
       headerValue: "Value",
       addHeader: "Add header",
-      advCompat: "Compatibility",
       advConnection: "Transport and retry",
       advTransport: "Transport",
       advCacheRetention: "Cache retention",
@@ -6062,7 +5937,9 @@ window.__ModuleLoader__.load({
       advReasoningEffort: "Reasoning level",
       advMaxTokens: "Output cap",
       advMaxRequestImages: "Images per request",
-      advOffloadCountQuantum: "Offload count quantum"
+      advOffloadCountQuantum: "Offload count quantum",
+      requestSettings: "Request settings",
+      advBehaviour: "Thinking and output"
     };
 
     // src/client/entry.jsx

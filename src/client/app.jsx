@@ -45,11 +45,9 @@ import {
   TRANSPORTS,
   CACHE_RETENTIONS,
   RETRY_MODES,
-  MODALITIES,
-  THINKING_BUDGET_LEVELS,
-  readAdvanced,
-  advancedCount,
-  buildAdvancedPatch,
+  readRequestSettings,
+  requestCount,
+  buildRequestPatch,
   DEEPSEEK_EFFORTS,
   readDeepseekAdvanced,
   deepseekCount,
@@ -1010,17 +1008,15 @@ function AdvancedSection({ title, children }) {
   )
 }
 
-/** The route-level knobs the main card does not show: defaults, headers,
- *  compatibility, transport and retry, image budgets, thinking budgets. */
-function AdvancedCard({ t, api, state, onChange, disabled }) {
-  const [open, setOpen] = React.useState(() => advancedCount(state) > 0)
-  const count = advancedCount(state)
+/** The provider's own request settings: headers, transport, timeouts, retry
+ *  policy and image budgets. Nothing model-level belongs here — a model's
+ *  thinking levels and wire compatibility are edited on the model itself. */
+function RequestCard({ t, state, onChange, disabled }) {
+  const [open, setOpen] = React.useState(() => requestCount(state) > 0)
+  const count = requestCount(state)
   const set = (patch) => onChange({ ...state, ...patch })
   const clearOption = { value: '', label: t('advUnset') }
-  const options = (values, labels) => [clearOption].concat(values.map((value) => ({
-    value,
-    label: labels !== undefined && labels[value] !== undefined ? `${labels[value]} · ${value}` : value,
-  })))
+  const options = (values) => [clearOption].concat(values.map((value) => ({ value, label: value })))
 
   return (
     <section className="dpp-advBlock">
@@ -1031,95 +1027,11 @@ function AdvancedCard({ t, api, state, onChange, disabled }) {
         onClick={() => setOpen((value) => !value)}
       >
         <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} className="dpp-advChevron" />
-        <span className="dpp-advTitle">{t('advanced')}</span>
+        <span className="dpp-advTitle">{t('requestSettings')}</span>
         {count > 0 ? <span className="dpp-badge">{count}</span> : null}
       </button>
       {open ? (
         <div className="dpp-advBody">
-          <AdvancedSection title={t('advDefaults')}>
-            <div className="dpp-formGrid">
-              <div className="dpp-field">
-                <span className="dpp-fieldLabel">{t('advReasoning')}</span>
-                <SelectMenu
-                  value={state.reasoning}
-                  ariaLabel={t('advReasoning')}
-                  disabled={disabled}
-                  options={[clearOption].concat(THINKING_LEVELS.map((level) => ({ value: level, label: levelLabel(t, level) })))}
-                  onChange={(next) => set({ reasoning: next })}
-                />
-              </div>
-              <div className="dpp-field">
-                <span className="dpp-fieldLabel">{t('advDefaultContext')}</span>
-                <input
-                  className="dpp-input"
-                  inputMode="numeric"
-                  value={state.defaultContextWindow}
-                  placeholder="262144"
-                  aria-label={t('advDefaultContext')}
-                  disabled={disabled}
-                  onChange={(event) => set({ defaultContextWindow: event.target.value })}
-                />
-              </div>
-              <div className="dpp-field">
-                <span className="dpp-fieldLabel">{t('advDefaultMaxTokens')}</span>
-                <input
-                  className="dpp-input"
-                  inputMode="numeric"
-                  value={state.defaultMaxTokens}
-                  placeholder="32768"
-                  aria-label={t('advDefaultMaxTokens')}
-                  disabled={disabled}
-                  onChange={(event) => set({ defaultMaxTokens: event.target.value })}
-                />
-              </div>
-              <div className="dpp-field">
-                <span className="dpp-fieldLabel">{t('advDefaultInput')}</span>
-                <div className="dpp-chipRow">
-                  {MODALITIES.map((kind) => {
-                    const on = state.defaultInput.includes(kind)
-                    return (
-                      <button
-                        key={kind}
-                        type="button"
-                        className={`dpp-chip${on ? ' is-on' : ''}`}
-                        aria-pressed={on}
-                        disabled={disabled}
-                        onClick={() => set({
-                          defaultInput: on
-                            ? state.defaultInput.filter((item) => item !== kind)
-                            : state.defaultInput.concat([kind]),
-                        })}
-                      >
-                        {on ? <Icon name="check" size={12} strokeWidth={2.6} /> : null}
-                        {kind === 'text' ? t('inputText') : t('inputImage')}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="dpp-field">
-              <span className="dpp-fieldLabel">{t('advThinkingBudgets')}</span>
-              <div className="dpp-budgetGrid">
-                {THINKING_BUDGET_LEVELS.map((level) => (
-                  <label className="dpp-budgetCell" key={level}>
-                    <span className="dpp-chipLabel">{level}</span>
-                    <input
-                      className="dpp-input"
-                      inputMode="numeric"
-                      value={state.thinkingBudgets[level]}
-                      aria-label={`${t('advThinkingBudgets')} ${level}`}
-                      disabled={disabled}
-                      onChange={(event) => set({
-                        thinkingBudgets: { ...state.thinkingBudgets, [level]: event.target.value },
-                      })}
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-          </AdvancedSection>
-
           <AdvancedSection title={t('advHeaders')}>
             <div className="dpp-kvList">
               {state.headers.map(([name, value], index) => (
@@ -1167,16 +1079,6 @@ function AdvancedCard({ t, api, state, onChange, disabled }) {
                 {t('addHeader')}
               </button>
             </div>
-          </AdvancedSection>
-
-          <AdvancedSection title={t('advCompat')}>
-            <CompatEditor
-              t={t}
-              api={api}
-              rows={state.compat}
-              onChange={(rows) => set({ compat: rows })}
-              disabled={disabled}
-            />
           </AdvancedSection>
 
           <AdvancedSection title={t('advConnection')}>
@@ -1241,7 +1143,10 @@ function AdvancedCard({ t, api, state, onChange, disabled }) {
                   value={state.retryMode}
                   ariaLabel={t('advRetry')}
                   disabled={disabled}
-                  options={options(RETRY_MODES, { normal: t('advRetryNormal'), always: t('advRetryAlways') })}
+                  options={[clearOption,
+                    { value: 'normal', label: t('advRetryNormal') },
+                    { value: 'always', label: t('advRetryAlways') },
+                  ]}
                   onChange={(next) => set({ retryMode: next })}
                 />
               </div>
@@ -1352,7 +1257,7 @@ function DeepseekAdvancedCard({ t, state, onChange, disabled }) {
       </button>
       {open ? (
         <div className="dpp-advBody">
-          <AdvancedSection title={t('advDefaults')}>
+          <AdvancedSection title={t('advBehaviour')}>
             <div className="dpp-formGrid">
               <div className="dpp-field">
                 <span className="dpp-fieldLabel">{t('advThinking')}</span>
@@ -1389,18 +1294,6 @@ function DeepseekAdvancedCard({ t, state, onChange, disabled }) {
                   aria-label={t('advMaxTokens')}
                   disabled={disabled}
                   onChange={(event) => set({ maxTokens: event.target.value })}
-                />
-              </div>
-              <div className="dpp-field">
-                <span className="dpp-fieldLabel">{t('advDefaultContext')}</span>
-                <input
-                  className="dpp-input"
-                  inputMode="numeric"
-                  value={state.defaultContextWindow}
-                  placeholder="262144"
-                  aria-label={t('advDefaultContext')}
-                  disabled={disabled}
-                  onChange={(event) => set({ defaultContextWindow: event.target.value })}
                 />
               </div>
             </div>
@@ -1464,7 +1357,9 @@ function ModelDialog({ t, model, api, showAdvanced, onSave, onCancel }) {
   const [form, setForm] = React.useState(initial)
   const [thinking, setThinking] = React.useState(() => readReasoning(model))
   const [compat, setCompat] = React.useState(() => readCompat(model.compat, api))
-  const [compatOpen, setCompatOpen] = React.useState(() => readCompat(model.compat, api).length > 0)
+  const [advancedOpen, setAdvancedOpen] = React.useState(() => (
+    readCompat(model.compat, api).length > 0 || readReasoning(model).mode !== 'inherit'
+  ))
   const [error, setError] = React.useState('')
   const set = (patch) => setForm((previous) => ({ ...previous, ...patch }))
   const toggleInput = (kind) => setForm((previous) => ({
@@ -1511,6 +1406,8 @@ function ModelDialog({ t, model, api, showAdvanced, onSave, onCancel }) {
     setCompat(readCompat(model.compat, api))
     setError('')
   }
+
+  const declared = (thinking.mode === 'inherit' ? 0 : 1) + (compat.length > 0 ? 1 : 0)
 
   return (
     <Modal
@@ -1593,30 +1490,33 @@ function ModelDialog({ t, model, api, showAdvanced, onSave, onCancel }) {
         </div>
       </div>
       {showAdvanced ? (
-        <>
-          <div className="dpp-field">
-            <span className="dpp-fieldLabel">
-              <Icon name="sparkles" size={13} className="dpp-fieldIcon" />
-              {t('thinking')}
-            </span>
-            <ThinkingEditor t={t} state={thinking} onChange={setThinking} />
-          </div>
-          <div className="dpp-advInline">
-            <button
-              type="button"
-              className="dpp-advToggle"
-              aria-expanded={compatOpen}
-              onClick={() => setCompatOpen((value) => !value)}
-            >
-              <Icon name={compatOpen ? 'chevron-down' : 'chevron-right'} size={13} />
-              {t('compat')}
-              {compat.length > 0 ? <span className="dpp-badge">{compat.length}</span> : null}
-            </button>
-            {compatOpen ? (
-              <CompatEditor t={t} api={api} rows={compat} onChange={setCompat} />
-            ) : null}
-          </div>
-        </>
+        <div className="dpp-modelAdvanced">
+          <button
+            type="button"
+            className="dpp-advToggle"
+            aria-expanded={advancedOpen}
+            onClick={() => setAdvancedOpen((value) => !value)}
+          >
+            <Icon name={advancedOpen ? 'chevron-down' : 'chevron-right'} size={13} />
+            {t('advanced')}
+            {declared !== 0 ? <span className="dpp-badge">{declared}</span> : null}
+          </button>
+          {advancedOpen ? (
+            <div className="dpp-advPanel">
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">
+                  <Icon name="sparkles" size={13} className="dpp-fieldIcon" />
+                  {t('thinking')}
+                </span>
+                <ThinkingEditor t={t} state={thinking} onChange={setThinking} />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('compat')}</span>
+                <CompatEditor t={t} api={api} rows={compat} onChange={setCompat} />
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {error !== '' ? <Alert kind="err" text={error} /> : null}
     </Modal>
@@ -1802,7 +1702,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
   const [data, setData] = React.useState(null)
   const [draft, setDraft] = React.useState(null)
   const [models, setModels] = React.useState([])
-  const [advanced, setAdvanced] = React.useState(null)
+  const [request, setRequest] = React.useState(null)
   const [showKey, setShowKey] = React.useState(false)
   const [keyDraft, setKeyDraft] = React.useState('')
   const [keyEditing, setKeyEditing] = React.useState(false)
@@ -1832,9 +1732,9 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     const rawAdvanced = result.advanced !== null && typeof result.advanced === 'object'
       ? result.advanced
       : {}
-    setAdvanced(result.source === 'deepseek'
+    setRequest(result.source === 'deepseek'
       ? readDeepseekAdvanced(rawAdvanced)
-      : readAdvanced({ ...rawAdvanced, api: result.api }))
+      : readRequestSettings(rawAdvanced))
     setLoadError('')
   }, [])
 
@@ -1878,12 +1778,9 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     api: data.api || '',
     baseURL: data.baseURL || '',
     models: Array.isArray(data.models) ? data.models : [],
-    advanced: data.source === 'deepseek'
+    request: data.source === 'deepseek'
       ? readDeepseekAdvanced(data.advanced)
-      : readAdvanced({
-        ...(data.advanced !== null && typeof data.advanced === 'object' ? data.advanced : {}),
-        api: data.api,
-      }),
+      : readRequestSettings(data.advanced),
   })), [data])
 
   const current = draft === null ? '' : JSON.stringify({
@@ -1891,7 +1788,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     api: draft.api,
     baseURL: draft.baseURL,
     models,
-    advanced,
+    request,
   })
 
   const pendingKey = keyEditing && keyDraft.trim() !== '' && keyDraft !== secret
@@ -1916,8 +1813,8 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
           return next
         }),
       }
-      if (advanced !== null) {
-        patch.advanced = data !== null && isOfficial(data) ? buildDeepseekPatch(advanced) : buildAdvancedPatch(advanced)
+      if (request !== null) {
+        patch.advanced = data !== null && isOfficial(data) ? buildDeepseekPatch(request) : buildRequestPatch(request)
       }
       const nextKey = pendingKey ? keyDraft.trim() : ''
       const result = await call(
@@ -1938,7 +1835,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     } finally {
       setBusy(false)
     }
-  }, [advanced, busy, call, data, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, route, t])
+  }, [busy, call, data, draft, keyDraft, load, models, onChanged, pendingKey, pushToast, readOnly, request, route, t])
 
   // Cmd/Ctrl+S saves from anywhere on the page.
   React.useEffect(() => {
@@ -2326,20 +2223,19 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
             />
           </div>
 
-          {advanced !== null ? (
+          {request !== null ? (
             official ? (
               <DeepseekAdvancedCard
                 t={t}
-                state={advanced}
-                onChange={setAdvanced}
+                state={request}
+                onChange={setRequest}
                 disabled={readOnly || busy}
               />
             ) : (
-              <AdvancedCard
+              <RequestCard
                 t={t}
-                api={draft.api}
-                state={advanced}
-                onChange={setAdvanced}
+                state={request}
+                onChange={setRequest}
                 disabled={readOnly || busy}
               />
             )
