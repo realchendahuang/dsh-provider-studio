@@ -1,5 +1,14 @@
 # dsh-provider-studio · 供应商管理
 
+[![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-0f1115)](#安装)
+[![Version](https://img.shields.io/github/package-json/v/realchendahuang/dsh-provider-studio?label=version)](https://github.com/realchendahuang/dsh-provider-studio/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/realchendahuang/dsh-provider-studio)](https://github.com/realchendahuang/dsh-provider-studio/commits/main)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/realchendahuang/dsh-provider-studio)](https://github.com/realchendahuang/dsh-provider-studio/graphs/commit-activity)
+[![Issues](https://img.shields.io/github/issues/realchendahuang/dsh-provider-studio)](https://github.com/realchendahuang/dsh-provider-studio/issues)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#贡献)
+
+
 **English** — A third-party settings page for DeepSeek Harness. It replaces the built-in **Models** panel and edits the `llm-pi-ai` provider configuration directly: browse providers, reveal / replace / clear API keys, and manage models without hand-editing `cordis.patch.yml`.
 
 DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字段，保存时会丢掉模型上未声明的配置，API 密钥也只写不回显。这个插件在设置面板里另开一页「供应商管理」，直接读写 `llm-pi-ai.providers` 和 DSH 凭据服务：一级是供应商列表，二级是所选供应商的编辑页；密钥可显示、复制、更换、清除，模型可增删改并做真实连通性测试。
@@ -178,6 +187,22 @@ python3 scripts/fetch-favicons.py  # 为缺 logo 的模板抓官网 favicon（�
 - `client.js` 由 `scripts/build-client.mjs` 用 esbuild 打成 CJS，再包进 `window.__ModuleLoader__.load` 的 factory；React 由 DSH 的模块表提供，不打进 bundle。
 - `src/client/icons.js`、`src/client/ui-icons.jsx`、`dist/` 都是生成物，不要手改；`client.js` 是例外——它是需要提交的发布产物。
 - `scripts/fetch-favicons.py` 读取本机的 `/tmp/providers.json` 与 `/tmp/models-dev.json` 缓存并写入 `icons/`，不是安装或构建的必需步骤。
+
+## 贡献
+
+欢迎 issue 和 PR。改动前先读「开发」和「实现要点」两节。
+
+```bash
+git clone https://github.com/realchendahuang/dsh-provider-studio.git
+cd dsh-provider-studio
+npm install
+npm run build:client   # 改了 src/client/ 之后需要
+```
+
+- PR 前请确认 `node scripts/build-client.mjs` 能通过，并把重新生成的 `client.js` 一起提交——插件安装时直接加载它。
+- Host 端改动（`index.js` / `contract.js`）必须重启 DSH 才能验证；只改客户端刷新窗口即可。
+- 提交信息用英文祈使句，例如 `Fix key reveal when the secret is empty`。
+- 版本变化记录在 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 已知限制
 
