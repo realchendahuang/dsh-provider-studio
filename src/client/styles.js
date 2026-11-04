@@ -304,7 +304,7 @@ export const CSS = `
 .dpp-modalIcon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:none;border-radius:7px;background:var(--dpp-fill);color:var(--dpp-fg3)}
 .dpp-modalIcon.is-danger{background:var(--dpp-badSoft);color:var(--dpp-bad)}
 .dpp-modalTitle{flex:1;margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
-.dpp-modalBody{padding:2px 18px 18px;overflow:auto;scrollbar-width:thin}
+.dpp-modalBody{display:flex;flex-direction:column;gap:14px;padding:2px 18px 18px;overflow:auto;scrollbar-width:thin}
 .dpp-modalBodyFlush{display:flex;flex-direction:column;flex:1;min-height:0;padding:6px 0 0;overflow:hidden}
 .dpp-modalFoot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--dpp-line1);background:var(--dpp-surface2);border-radius:0 0 var(--dpp-r-lg) var(--dpp-r-lg)}
 .dpp-footGap{flex:1}
@@ -374,14 +374,12 @@ export const CSS = `
 .dpp-advBody{display:flex;flex-direction:column;gap:16px;padding:2px 18px 18px;animation:dppViewIn var(--dpp-t) var(--dpp-ease) backwards}
 .dpp-advSection{display:flex;flex-direction:column;gap:10px}
 .dpp-advLabel{color:var(--dpp-fg3);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
-.dpp-advInline{display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px solid var(--dpp-line1)}
 .dpp-advToggle{display:flex;align-items:center;gap:6px;align-self:flex-start;height:26px;padding:0 4px;border:0;border-radius:var(--dpp-r-xs);background:transparent;color:var(--dpp-fg2);font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background var(--dpp-t),color var(--dpp-t)}
 .dpp-advToggle:hover{background:var(--dpp-hover);color:var(--dpp-fg)}
 .dpp-advToggle:focus-visible{outline:2px solid var(--dpp-brand);outline-offset:1px}
+.dpp-modelAdvanced{display:flex;flex-direction:column;gap:10px}
+.dpp-advPanel{display:flex;flex-direction:column;gap:12px;padding-top:2px;animation:dppViewIn var(--dpp-t) var(--dpp-ease) backwards}
 
-.dpp-budgetGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
-.dpp-budgetCell{display:flex;flex-direction:column;gap:4px;min-width:0}
-.dpp-chipLabel{color:var(--dpp-fg4);font-size:10.5px;letter-spacing:.02em}
 
 /* ------------------------------------------------------------ reduced motion */
 @media (prefers-reduced-motion: reduce){

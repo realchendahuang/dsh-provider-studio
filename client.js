@@ -3098,11 +3098,11 @@ window.__ModuleLoader__.load({
     }
 
     // src/client/app.jsx
-    var PROTO_LABELS = {
-      "openai-completions": "OpenAI \u517C\u5BB9",
-      "openai-responses": "OpenAI Responses",
-      "anthropic-messages": "Anthropic Messages",
-      "deepseek-official": "DeepSeek \u5B98\u65B9 API"
+    var PROTO_LABEL_KEYS = {
+      "openai-completions": "protoOpenaiCompat",
+      "openai-responses": "protoOpenaiResponses",
+      "anthropic-messages": "protoAnthropicMessages",
+      "deepseek-official": "protoDeepseek"
     };
     var PROTO_FALLBACK = ["openai-completions", "openai-responses", "anthropic-messages"];
     var EMPTY_DISCOVER = { models: [] };
@@ -3131,12 +3131,14 @@ window.__ModuleLoader__.load({
       const parsed = Number(text);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : void 0;
     }
-    function protoLabel(api) {
-      return PROTO_LABELS[api] || api || "\u2014";
+    function protoLabel(api, t) {
+      const key = PROTO_LABEL_KEYS[api];
+      return key ? t(key) : api || "\u2014";
     }
-    function protoOption(api) {
+    function protoOption(api, t) {
       const hint = PROTO_ENDPOINT[api];
-      return hint ? `${protoLabel(api)} (${hint})` : protoLabel(api);
+      const label = protoLabel(api, t);
+      return hint ? `${label} (${hint})` : label;
     }
     function modelCountText(item, t) {
       if (item.usesCatalog === true || !(item.modelCount > 0)) return t("usesCatalog");
@@ -3219,6 +3221,11 @@ window.__ModuleLoader__.load({
       }, [open, duration]);
       return { mounted: open || mounted, closing: !open && mounted };
     }
+    function providerName(item, t) {
+      if (item === null || item === void 0) return "";
+      if (typeof item.displayName === "string" && item.displayName !== "") return item.displayName;
+      return isOfficial(item) ? t("deepseekOfficial") : item.route || "";
+    }
     function ProviderMark({ iconKey, size = 24 }) {
       const src = iconKey !== null && iconKey !== void 0 ? PROVIDER_ICONS[iconKey] : null;
       const box = { width: size, height: size };
@@ -3236,7 +3243,7 @@ window.__ModuleLoader__.load({
     function Spinner({ size = 14 }) {
       return /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "loader", size, className: "dpp-spin" });
     }
-    function Modal({ open, onClose, title, label, className, bodyClassName, children, footer, showClose = true, icon, iconTone }) {
+    function Modal({ open, onClose, title, label, closeLabel, className, bodyClassName, children, footer, showClose = true, icon, iconTone }) {
       const { mounted, closing } = usePresence(open, 140);
       const panelRef = import_react2.default.useRef(null);
       import_react2.default.useEffect(() => {
@@ -3277,13 +3284,13 @@ window.__ModuleLoader__.load({
               onClose();
             }
           },
-          /* @__PURE__ */ import_react2.default.createElement("header", { className: "dpp-modalHead" }, icon ? /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-modalIcon${iconTone === "danger" ? " is-danger" : ""}`, "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: icon, size: 15 })) : null, /* @__PURE__ */ import_react2.default.createElement("h3", { className: "dpp-modalTitle" }, title), showClose ? /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-iconBtn", "aria-label": "\u5173\u95ED", onClick: onClose }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "x", size: 15 })) : null),
+          /* @__PURE__ */ import_react2.default.createElement("header", { className: "dpp-modalHead" }, icon ? /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-modalIcon${iconTone === "danger" ? " is-danger" : ""}`, "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: icon, size: 15 })) : null, /* @__PURE__ */ import_react2.default.createElement("h3", { className: "dpp-modalTitle" }, title), showClose ? /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-iconBtn", "aria-label": closeLabel || title, onClick: onClose }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "x", size: 15 })) : null),
           /* @__PURE__ */ import_react2.default.createElement("div", { className: bodyClassName ? `dpp-modalBody ${bodyClassName}` : "dpp-modalBody" }, children),
           footer ? /* @__PURE__ */ import_react2.default.createElement("footer", { className: "dpp-modalFoot" }, footer) : null
         )
       );
     }
-    function ConfirmDialog({ ask, onClose }) {
+    function ConfirmDialog({ ask, onClose, t }) {
       const [busy, setBusy] = import_react2.default.useState(false);
       import_react2.default.useEffect(() => {
         if (ask === null) setBusy(false);
@@ -3311,7 +3318,7 @@ window.__ModuleLoader__.load({
           showClose: false,
           icon: "circle-alert",
           iconTone: ask.danger ? "danger" : "plain",
-          footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: onClose, disabled: busy }, ask.cancelLabel || "\u53D6\u6D88"), /* @__PURE__ */ import_react2.default.createElement(
+          footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: onClose, disabled: busy }, ask.cancelLabel || t("cancel")), /* @__PURE__ */ import_react2.default.createElement(
             "button",
             {
               type: "button",
@@ -3565,7 +3572,7 @@ window.__ModuleLoader__.load({
           onClick: () => onOpen(item.route)
         },
         /* @__PURE__ */ import_react2.default.createElement(ProviderMark, { iconKey: providerIcon(item), size: 22 }),
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-rowName" }, item.displayName || item.route),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-rowName" }, providerName(item, t)),
         /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "chevron-right", size: 14, className: "dpp-rowChevron" })
       )), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-addRow", onClick: onAdd, disabled: !writable }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-addRowIcon", "aria-hidden": "true" }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "plus", size: 14 })), /* @__PURE__ */ import_react2.default.createElement("span", null, t("create")))) : null);
     }
@@ -4155,6 +4162,7 @@ window.__ModuleLoader__.load({
           open: true,
           onClose: onCancel,
           title: t("editModel"),
+          closeLabel: t("close"),
           className: "dpp-modalModel",
           footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: reset }, t("resetForm")), /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-footGap" }), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: onCancel }, t("cancel")), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnPrimary", onClick: submit, disabled: form.id.trim() === "" }, t("save")))
         },
@@ -4281,6 +4289,7 @@ window.__ModuleLoader__.load({
             if (!busy) onClose();
           },
           title: t("pickModels"),
+          closeLabel: t("close"),
           className: "dpp-modalPick",
           bodyClassName: "dpp-modalBodyFlush",
           footer: /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(
@@ -4589,14 +4598,13 @@ window.__ModuleLoader__.load({
           }
         });
       };
-      const menuItems = [
-        {
+      const menuItems = [];
+      if (!builtin) {
+        menuItems.push({
           icon: "pencil",
           label: t("rename"),
           onSelect: () => setRenaming(true)
-        }
-      ];
-      if (!builtin) {
+        });
         menuItems.push({
           icon: "trash-2",
           label: t("deleteProvider"),
@@ -4639,9 +4647,9 @@ window.__ModuleLoader__.load({
           disabled: readOnly,
           onClick: () => setRenaming(true)
         },
-        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-titleText" }, draft.displayName || route),
+        /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-titleText" }, draft.displayName || (official ? t("deepseekOfficial") : route)),
         /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "pencil", size: 12, className: "dpp-titlePen" })
-      ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-providerMeta" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-mono" }, route), /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-metaDot", "aria-hidden": "true" }), /* @__PURE__ */ import_react2.default.createElement("span", null, modelCountText({ ...data, modelCount: models.length }, t)), builtin ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-tag" }, t("builtin")) : null)), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-cardHeadActions" }, /* @__PURE__ */ import_react2.default.createElement(ActionMenu, { items: menuItems, label: t("providerActions") }))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-cardBody" }, /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("baseURL") }, /* @__PURE__ */ import_react2.default.createElement(
+      ), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-providerMeta" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-mono" }, route), /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-metaDot", "aria-hidden": "true" }), /* @__PURE__ */ import_react2.default.createElement("span", null, modelCountText({ ...data, modelCount: models.length }, t)), builtin ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-tag" }, t("builtin")) : null)), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-cardHeadActions" }, menuItems.length > 0 ? /* @__PURE__ */ import_react2.default.createElement(ActionMenu, { items: menuItems, label: t("providerActions") }) : null)), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-cardBody" }, /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("baseURL") }, /* @__PURE__ */ import_react2.default.createElement(
         "input",
         {
           className: "dpp-input dpp-inputMono",
@@ -4656,7 +4664,7 @@ window.__ModuleLoader__.load({
           value: draft.api,
           disabled: readOnly,
           ariaLabel: t("protocol"),
-          options: apiOptions.map((api) => ({ value: api, label: protoOption(api) })),
+          options: apiOptions.map((api) => ({ value: api, label: protoOption(api, t) })),
           onChange: (next) => setDraft({ ...draft, api: next })
         }
       )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, /* @__PURE__ */ import_react2.default.createElement("span", null, t("apiKey")), /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-keyState${secret ? " is-on" : ""}` }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-keyDot", "aria-hidden": "true" }), secret ? t("keyConfigured") : t("keyMissing"))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-keyWrap" }, /* @__PURE__ */ import_react2.default.createElement(
@@ -4820,7 +4828,7 @@ window.__ModuleLoader__.load({
           onClose: () => setPickerOpen(false),
           onAdd: addDiscovered
         }
-      ), /* @__PURE__ */ import_react2.default.createElement(ConfirmDialog, { ask, onClose: () => setAsk(null) }));
+      ), /* @__PURE__ */ import_react2.default.createElement(ConfirmDialog, { ask, t, onClose: () => setAsk(null) }));
     }
     function TemplatePicker({ t, onPick, onBack }) {
       const [query, setQuery] = import_react2.default.useState("");
@@ -4957,7 +4965,7 @@ window.__ModuleLoader__.load({
         {
           value: form.api,
           ariaLabel: t("protocol"),
-          options: protocols.map((api) => ({ value: api, label: protoOption(api) })),
+          options: protocols.map((api) => ({ value: api, label: protoOption(api, t) })),
           onChange: (next) => set({ api: next })
         }
       )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("baseURL") }, /* @__PURE__ */ import_react2.default.createElement(
@@ -5025,8 +5033,9 @@ window.__ModuleLoader__.load({
       }
       render() {
         if (this.state.error === null) return this.props.children;
+        const t = typeof this.props.t === "function" ? this.props.t : null;
         const message = this.state.error && this.state.error.message ? this.state.error.message : String(this.state.error);
-        return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-root" }, /* @__PURE__ */ import_react2.default.createElement(Alert, { kind: "err", text: "\u9762\u677F\u6E32\u67D3\u5931\u8D25", detail: message }), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: () => this.setState({ error: null }) }, "\u91CD\u8BD5"));
+        return /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-root" }, /* @__PURE__ */ import_react2.default.createElement(Alert, { kind: "err", text: t ? t("renderFailed") : "\u9762\u677F\u6E32\u67D3\u5931\u8D25", detail: message }), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn", onClick: () => this.setState({ error: null }) }, t ? t("retry") : "\u91CD\u8BD5"));
       }
     };
     function PanelPageInner({ t, call }) {
@@ -5198,7 +5207,7 @@ window.__ModuleLoader__.load({
       ), /* @__PURE__ */ import_react2.default.createElement(Toasts, { t, items: toasts, onDismiss: dismissToast }));
     }
     function PanelPage(props) {
-      return /* @__PURE__ */ import_react2.default.createElement(PanelBoundary, null, /* @__PURE__ */ import_react2.default.createElement(PanelPageInner, { ...props }));
+      return /* @__PURE__ */ import_react2.default.createElement(PanelBoundary, { t: props.t }, /* @__PURE__ */ import_react2.default.createElement(PanelPageInner, { ...props }));
     }
 
     // src/client/styles.js
@@ -5498,7 +5507,7 @@ window.__ModuleLoader__.load({
     .dpp-modalIcon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:none;border-radius:7px;background:var(--dpp-fill);color:var(--dpp-fg3)}
     .dpp-modalIcon.is-danger{background:var(--dpp-badSoft);color:var(--dpp-bad)}
     .dpp-modalTitle{flex:1;margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
-    .dpp-modalBody{padding:2px 18px 18px;overflow:auto;scrollbar-width:thin}
+    .dpp-modalBody{display:flex;flex-direction:column;gap:14px;padding:2px 18px 18px;overflow:auto;scrollbar-width:thin}
     .dpp-modalBodyFlush{display:flex;flex-direction:column;flex:1;min-height:0;padding:6px 0 0;overflow:hidden}
     .dpp-modalFoot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--dpp-line1);background:var(--dpp-surface2);border-radius:0 0 var(--dpp-r-lg) var(--dpp-r-lg)}
     .dpp-footGap{flex:1}
@@ -5568,14 +5577,12 @@ window.__ModuleLoader__.load({
     .dpp-advBody{display:flex;flex-direction:column;gap:16px;padding:2px 18px 18px;animation:dppViewIn var(--dpp-t) var(--dpp-ease) backwards}
     .dpp-advSection{display:flex;flex-direction:column;gap:10px}
     .dpp-advLabel{color:var(--dpp-fg3);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
-    .dpp-advInline{display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px solid var(--dpp-line1)}
     .dpp-advToggle{display:flex;align-items:center;gap:6px;align-self:flex-start;height:26px;padding:0 4px;border:0;border-radius:var(--dpp-r-xs);background:transparent;color:var(--dpp-fg2);font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background var(--dpp-t),color var(--dpp-t)}
     .dpp-advToggle:hover{background:var(--dpp-hover);color:var(--dpp-fg)}
     .dpp-advToggle:focus-visible{outline:2px solid var(--dpp-brand);outline-offset:1px}
+    .dpp-modelAdvanced{display:flex;flex-direction:column;gap:10px}
+    .dpp-advPanel{display:flex;flex-direction:column;gap:12px;padding-top:2px;animation:dppViewIn var(--dpp-t) var(--dpp-ease) backwards}
 
-    .dpp-budgetGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
-    .dpp-budgetCell{display:flex;flex-direction:column;gap:4px;min-width:0}
-    .dpp-chipLabel{color:var(--dpp-fg4);font-size:10.5px;letter-spacing:.02em}
 
     /* ------------------------------------------------------------ reduced motion */
     @media (prefers-reduced-motion: reduce){
@@ -5611,6 +5618,10 @@ window.__ModuleLoader__.load({
       confirmDelete: "\u6A21\u578B\u914D\u7F6E\u4F1A\u4ECE llm-pi-ai \u79FB\u9664\uFF0C\u5BC6\u94A5\u4ECD\u4FDD\u7559\u5728\u51ED\u636E\u5E93\u3002",
       displayName: "\u663E\u793A\u540D\u79F0",
       protocol: "\u534F\u8BAE",
+      protoOpenaiCompat: "OpenAI \u517C\u5BB9",
+      protoOpenaiResponses: "OpenAI Responses",
+      protoAnthropicMessages: "Anthropic Messages",
+      protoDeepseek: "DeepSeek \u5B98\u65B9 API",
       baseURL: "Base URL",
       apiKey: "API Key",
       keyConfigured: "\u5BC6\u94A5\u5DF2\u914D\u7F6E",
@@ -5651,12 +5662,15 @@ window.__ModuleLoader__.load({
       readOnly: "\u5F53\u524D\u8BBE\u7F6E\u53EA\u8BFB\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u3002",
       pickModels: "\u9009\u62E9\u8981\u52A0\u5165\u7684\u6A21\u578B",
       close: "\u5173\u95ED",
+      retry: "\u91CD\u8BD5",
+      renderFailed: "\u9762\u677F\u6E32\u67D3\u5931\u8D25",
       keyCleared: "\u5BC6\u94A5\u5DF2\u6E05\u9664",
       needRoute: "\u8BF7\u586B\u5199\u8DEF\u7531 ID",
       needBaseURL: "Base URL \u5FC5\u987B\u4EE5 http:// \u6216 https:// \u5F00\u5934",
       // --- added for the redesigned panel -------------------------------------
       edit: "\u7F16\u8F91",
       builtin: "\u5185\u7F6E",
+      deepseekOfficial: "DeepSeek \u5B98\u65B9",
       officialProtocol: "DeepSeek \u5B98\u65B9 API",
       createSubmit: "\u521B\u5EFA",
       firstModel: "\u9996\u4E2A\u6A21\u578B ID",
@@ -5787,6 +5801,10 @@ window.__ModuleLoader__.load({
       confirmDelete: "Delete this provider? Its model configuration is removed from llm-pi-ai; the key stays in the credential store.",
       displayName: "Display name",
       protocol: "Protocol",
+      protoOpenaiCompat: "OpenAI compatible",
+      protoOpenaiResponses: "OpenAI Responses",
+      protoAnthropicMessages: "Anthropic Messages",
+      protoDeepseek: "DeepSeek API",
       baseURL: "Base URL",
       apiKey: "API key",
       keyConfigured: "Key configured",
@@ -5827,12 +5845,15 @@ window.__ModuleLoader__.load({
       readOnly: "Settings are read-only; nothing can be saved.",
       pickModels: "Pick models to add",
       close: "Close",
+      retry: "Retry",
+      renderFailed: "Panel failed to render",
       keyCleared: "Key cleared",
       needRoute: "Route ID is required",
       needBaseURL: "Base URL must start with http:// or https://",
       // --- added for the redesigned panel -------------------------------------
       edit: "Edit",
       builtin: "Built-in",
+      deepseekOfficial: "DeepSeek",
       officialProtocol: "DeepSeek official API",
       createSubmit: "Create",
       firstModel: "First model ID",

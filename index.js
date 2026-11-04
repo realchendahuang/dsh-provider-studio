@@ -677,7 +677,7 @@ function deepseekView(config, info, secret) {
     route: DEEPSEEK_NS,
     source: 'deepseek',
     builtin: true,
-    displayName: 'DeepSeek 官方',
+    displayName: '',
     api: DEEPSEEK_API,
     baseURL: text(config.baseURL) || DEEPSEEK_DEFAULT_BASE,
     apiKeyEnv: ref,

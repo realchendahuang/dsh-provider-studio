@@ -54,11 +54,11 @@ import {
   buildDeepseekPatch,
 } from './fields.js'
 
-const PROTO_LABELS = {
-  'openai-completions': 'OpenAI 兼容',
-  'openai-responses': 'OpenAI Responses',
-  'anthropic-messages': 'Anthropic Messages',
-  'deepseek-official': 'DeepSeek 官方 API',
+const PROTO_LABEL_KEYS = {
+  'openai-completions': 'protoOpenaiCompat',
+  'openai-responses': 'protoOpenaiResponses',
+  'anthropic-messages': 'protoAnthropicMessages',
+  'deepseek-official': 'protoDeepseek',
 }
 
 const PROTO_FALLBACK = ['openai-completions', 'openai-responses', 'anthropic-messages']
@@ -100,13 +100,15 @@ function parseNumber(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
 }
 
-function protoLabel(api) {
-  return PROTO_LABELS[api] || api || '—'
+function protoLabel(api, t) {
+  const key = PROTO_LABEL_KEYS[api]
+  return key ? t(key) : (api || '—')
 }
 
-function protoOption(api) {
+function protoOption(api, t) {
   const hint = PROTO_ENDPOINT[api]
-  return hint ? `${protoLabel(api)} (${hint})` : protoLabel(api)
+  const label = protoLabel(api, t)
+  return hint ? `${label} (${hint})` : label
 }
 
 /** '7 个模型' — the catalog row has no per-provider models of its own. */
@@ -216,6 +218,13 @@ function usePresence(open, duration = 140) {
   return { mounted: open || mounted, closing: !open && mounted }
 }
 
+/** Display name with a localized fallback for the built-in DeepSeek row. */
+function providerName(item, t) {
+  if (item === null || item === undefined) return ''
+  if (typeof item.displayName === 'string' && item.displayName !== '') return item.displayName
+  return isOfficial(item) ? t('deepseekOfficial') : (item.route || '')
+}
+
 /** Provider logo, ZCode style: official asset when we have one, a neutral
  *  package glyph when we do not (no invented monograms). */
 function ProviderMark({ iconKey, size = 24 }) {
@@ -265,7 +274,7 @@ function Spinner({ size = 14 }) {
 
 /** Minimal dialog: focus lands inside, Escape and the scrim close it, and the
  *  panel keeps its exit animation via usePresence. */
-function Modal({ open, onClose, title, label, className, bodyClassName, children, footer, showClose = true, icon, iconTone }) {
+function Modal({ open, onClose, title, label, closeLabel, className, bodyClassName, children, footer, showClose = true, icon, iconTone }) {
   const { mounted, closing } = usePresence(open, 140)
   const panelRef = React.useRef(null)
 
@@ -315,7 +324,7 @@ function Modal({ open, onClose, title, label, className, bodyClassName, children
           ) : null}
           <h3 className="dpp-modalTitle">{title}</h3>
           {showClose ? (
-            <button type="button" className="dpp-iconBtn" aria-label="关闭" onClick={onClose}>
+            <button type="button" className="dpp-iconBtn" aria-label={closeLabel || title} onClick={onClose}>
               <Icon name="x" size={15} />
             </button>
           ) : null}
@@ -330,7 +339,7 @@ function Modal({ open, onClose, title, label, className, bodyClassName, children
 }
 
 /** Confirm sheet for destructive or lossy actions. */
-function ConfirmDialog({ ask, onClose }) {
+function ConfirmDialog({ ask, onClose, t }) {
   const [busy, setBusy] = React.useState(false)
 
   React.useEffect(() => {
@@ -362,7 +371,7 @@ function ConfirmDialog({ ask, onClose }) {
       footer={(
         <>
           <button type="button" className="dpp-btn" onClick={onClose} disabled={busy}>
-            {ask.cancelLabel || '取消'}
+            {ask.cancelLabel || t('cancel')}
           </button>
           <button
             type="button"
@@ -685,7 +694,7 @@ function ProviderList({ t, providers, loading, writable, error, refreshing, onOp
               onClick={() => onOpen(item.route)}
             >
               <ProviderMark iconKey={providerIcon(item)} size={22} />
-              <span className="dpp-rowName">{item.displayName || item.route}</span>
+              <span className="dpp-rowName">{providerName(item, t)}</span>
               <Icon name="chevron-right" size={14} className="dpp-rowChevron" />
             </button>
           ))}
@@ -1414,6 +1423,7 @@ function ModelDialog({ t, model, api, showAdvanced, onSave, onCancel }) {
       open
       onClose={onCancel}
       title={t('editModel')}
+      closeLabel={t('close')}
       className="dpp-modalModel"
       footer={(
         <>
@@ -1588,6 +1598,7 @@ function DiscoverModal({ open, t, result, onClose, onAdd, busy }) {
       open={open}
       onClose={() => { if (!busy) onClose() }}
       title={t('pickModels')}
+      closeLabel={t('close')}
       className="dpp-modalPick"
       bodyClassName="dpp-modalBodyFlush"
       footer={(
@@ -1995,14 +2006,13 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     })
   }
 
-  const menuItems = [
-    {
+  const menuItems = []
+  if (!builtin) {
+    menuItems.push({
       icon: 'pencil',
       label: t('rename'),
       onSelect: () => setRenaming(true),
-    },
-  ]
-  if (!builtin) {
+    })
     menuItems.push({
       icon: 'trash-2',
       label: t('deleteProvider'),
@@ -2055,7 +2065,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
                 disabled={readOnly}
                 onClick={() => setRenaming(true)}
               >
-                <span className="dpp-titleText">{draft.displayName || route}</span>
+                <span className="dpp-titleText">{draft.displayName || (official ? t('deepseekOfficial') : route)}</span>
                 <Icon name="pencil" size={12} className="dpp-titlePen" />
               </button>
             )}
@@ -2067,7 +2077,9 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
             </div>
           </div>
           <div className="dpp-cardHeadActions">
-            <ActionMenu items={menuItems} label={t('providerActions')} />
+            {menuItems.length > 0 ? (
+              <ActionMenu items={menuItems} label={t('providerActions')} />
+            ) : null}
           </div>
         </header>
 
@@ -2090,7 +2102,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
                 value={draft.api}
                 disabled={readOnly}
                 ariaLabel={t('protocol')}
-                options={apiOptions.map((api) => ({ value: api, label: protoOption(api) }))}
+                options={apiOptions.map((api) => ({ value: api, label: protoOption(api, t) }))}
                 onChange={(next) => setDraft({ ...draft, api: next })}
               />
             )}
@@ -2280,7 +2292,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
         onAdd={addDiscovered}
       />
 
-      <ConfirmDialog ask={ask} onClose={() => setAsk(null)} />
+      <ConfirmDialog ask={ask} t={t} onClose={() => setAsk(null)} />
     </div>
   )
 }
@@ -2513,7 +2525,7 @@ function CreateForm({ protocols, t, onCancel, onSubmit, busy, initial }) {
               <SelectMenu
                 value={form.api}
                 ariaLabel={t('protocol')}
-                options={protocols.map((api) => ({ value: api, label: protoOption(api) }))}
+                options={protocols.map((api) => ({ value: api, label: protoOption(api, t) }))}
                 onChange={(next) => set({ api: next })}
               />
             </Field>
@@ -2616,14 +2628,15 @@ class PanelBoundary extends React.Component {
 
   render() {
     if (this.state.error === null) return this.props.children
+    const t = typeof this.props.t === 'function' ? this.props.t : null
     const message = this.state.error && this.state.error.message
       ? this.state.error.message
       : String(this.state.error)
     return (
       <div className="dpp-root">
-        <Alert kind="err" text="面板渲染失败" detail={message} />
+        <Alert kind="err" text={t ? t('renderFailed') : '面板渲染失败'} detail={message} />
         <button type="button" className="dpp-btn" onClick={() => this.setState({ error: null })}>
-          重试
+          {t ? t('retry') : '重试'}
         </button>
       </div>
     )
@@ -2807,7 +2820,7 @@ function PanelPageInner({ t, call }) {
 
 export function PanelPage(props) {
   return (
-    <PanelBoundary>
+    <PanelBoundary t={props.t}>
       <PanelPageInner {...props} />
     </PanelBoundary>
   )
