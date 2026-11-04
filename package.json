@@ -1,0 +1,78 @@
+{
+  "name": "dsh-provider-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Third-party provider manager settings page for DeepSeek Harness: browse and edit llm-pi-ai providers, API keys and models.",
+  "license": "MIT",
+  "author": "dsh-provider-studio contributors",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "llm-pi-ai",
+    "provider",
+    "providers",
+    "api-key",
+    "settings",
+    "plugin",
+    "cordis"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.5"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "contract.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "scripts": {
+    "build:client": "node scripts/build-client.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-typert-protocol": "^0.2.1-rc.5",
+    "yaml": "^2.9.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/realchendahuang/dsh-provider-studio.git"
+  },
+  "homepage": "https://github.com/realchendahuang/dsh-provider-studio#readme",
+  "bugs": {
+    "url": "https://github.com/realchendahuang/dsh-provider-studio/issues"
+  }
+}

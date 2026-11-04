@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build intermediates: build-client.mjs writes the esbuild bundle here, then
+# wraps it into client.js. client.js itself is a shipped artifact and MUST stay
+# tracked — the plugin loader reads it directly on install.
+dist/
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Local environment and secrets (this plugin stores keys via the DSH credential
+# service, never in the repository)
+.env
+.env.*
+*.local
+
+# Packaging output
+*.tgz

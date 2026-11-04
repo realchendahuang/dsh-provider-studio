@@ -1,0 +1,9 @@
+- insert:
+    - id: dsh-provider-studio
+      name: dsh-provider-studio
+
+# 用本插件的「供应商管理」替代官方 Models 设置页：
+# 官方页只认 schema 投影后的字段（保存会丢 reasoningEfforts 等手写字段），
+# 而且密钥只写不回显。想恢复官方页：把下面 disabled 改成 false（或删掉两行），重启 DSH。
+- id: ui-settings-models
+  disabled: true

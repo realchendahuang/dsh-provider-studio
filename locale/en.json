@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Provider Panel",
+    "description": "Browse and edit llm-pi-ai providers, models and API keys: reveal, copy, and replace a key without touching YAML."
+  }
+}
