@@ -8,42 +8,171 @@
 [![Issues](https://img.shields.io/github/issues/realchendahuang/dsh-provider-studio)](https://github.com/realchendahuang/dsh-provider-studio/issues)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#贡献)
 
-
 **English** — A third-party settings page for DeepSeek Harness. It replaces the built-in **Models** panel and edits the `llm-pi-ai` provider configuration directly: browse providers, reveal / replace / clear API keys, and manage models without hand-editing `cordis.patch.yml`.
 
 DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字段，保存时会丢掉模型上未声明的配置，API 密钥也只写不回显。这个插件在设置面板里另开一页「供应商管理」，直接读写 `llm-pi-ai.providers` 和 DSH 凭据服务：一级是供应商列表，二级是所选供应商的编辑页；密钥可显示、复制、更换、清除，模型可增删改并做真实连通性测试。
 
+## 特点
+
+- **密钥真的能看见**：官方页只写不回显；这里默认掩码，点一下就能显示、复制、更换、清除。
+- **配置不丢**：直接解析 profile 里的原始配置，而不是 schema 投影；`reasoningEfforts`、`compat`、`thinking` 等未声明字段保存时原样保留。
+- **一个页面管完**：供应商、Base URL、协议、密钥、模型增删改、单模型连通性测试、从端点批量拉取模型，不用再手改 `cordis.patch.yml`。
+- **新增供应商不用查文档**：内置 models.dev 全量目录里的 223 个模板（常用 / 国内 / 海外 / 网关），带品牌 logo；选一下就把 Base URL、协议、环境变量名填好。
+- **交互不将就**：就地改名、`…` 菜单、二次确认、未保存拦截、`Cmd/Ctrl+S`、右下角 Toast；Lucide 图标 + 统一动效，深色/浅色都可用。
+- **随时能退回官方页**：官方 Models 页由 bundle patch 隐藏，改一行配置就能恢复，不删包、不影响 `llm-pi-ai` / `llm-deepseek` 适配器。
+
 ## 预览
 
-**供应商列表**：一行一个供应商，点进去是二级编辑页。
+|  |  |
+|:---:|:---:|
+| ![供应商列表](docs/list.png)<br>供应商列表：只显示名字，点进二级页 | ![供应商详情](docs/detail.png)<br>供应商详情：URL、协议、密钥、模型一页管完 |
+| ![模板选择器](docs/templates.png)<br>模板选择器：223 个模板带品牌 logo | ![拉取模型](docs/discover.png)<br>拉取模型：搜索、全选、批量加入 |
+| ![编辑模型](docs/model-dialog.png)<br>编辑模型：上下文、最大输出、输入模态 | ![协议选择](docs/select.png)<br>协议选择：自绘下拉，不调系统菜单 |
 
-![供应商列表](docs/list.png)
+保存结果以右下角提示呈现，不打断当前页面：
 
-**供应商详情**：Base URL、协议、API 密钥和模型表都在一页里；标题旁的 `…` 菜单放重命名和删除。
+|  |
+|:---:|
+| ![保存提示](docs/toast.png)<br>保存提示：右下角 Toast，成功/失败都有 |
 
-![供应商详情](docs/detail.png)
+## 快速开始
 
-**新增供应商**：先选模板（223 个，带品牌 logo），也可以从空白自定义开始。
+```bash
+# 1. 装到桌面版 profile
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
 
-![模板选择器](docs/templates.png)
+# 2. 完全退出 DSH 再重新打开（不是刷新窗口）
 
-**拉取模型**：用当前端点列出可用模型，支持搜索与批量勾选。
+# 3. 设置 →「供应商管理」（英文界面为 Providers）
+```
 
-![拉取模型](docs/discover.png)
+装好后官方「Models」页会被替换成「供应商管理」，现有供应商和模型原样出现在列表里。
 
-**编辑模型**：模型 ID、显示名、上下文窗口、最大输出、输入模态。
+## 安装
 
-![编辑模型](docs/model-dialog.png)
+前置：DSH 桌面版（本插件按 `0.2.1-rc.5` 实测）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
 
-**协议选择**：自定义下拉，不再调起系统菜单。
+DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`，所以命令里的 `--profile` 要和你实际启动的那个一致。
 
-![协议选择](docs/select.png)
+### 方式一：直接从 GitHub 安装（推荐）
 
-保存结果以右下角提示呈现：
+```bash
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
+```
 
-![保存提示](docs/toast.png)
+- `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
+- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git`。
+- 想固定版本就带 commit：`github:realchendahuang/dsh-provider-studio#<commit-sha>`。
+- pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
 
-## 功能
+### 方式二：克隆到本地（开发 / 改代码）
+
+```bash
+git clone https://github.com/realchendahuang/dsh-provider-studio.git ~/code/dsh-provider-studio
+dsh plugin --profile desktop add ~/code/dsh-provider-studio
+```
+
+本地目录以 pnpm `link:` 依赖写入 profile，不复制文件；之后 `git pull`、改源码都不用重新 `add`。
+
+### 确认装上了
+
+```bash
+dsh plugin --profile desktop why dsh-provider-studio
+```
+
+能列出这个包就说明依赖和 bundle 都注册了。重启 DSH 后，设置里应出现「供应商管理」，官方「Models」页消失。
+
+### 重启 DSH 后生效
+
+安装或更新后需要**完整退出并重新启动 DSH**，而不是只刷新窗口：
+
+- Host 端代码（`index.js`）只在 DSH 启动时加载，刷新页面 / 重开设置不会加载新的 Host 代码；
+- 刷新窗口只会重载 `client.js`（浏览器端）；
+- 首次安装后如果「测试」提示需要重启 DSH（或报 404 / transport failure），说明 Host 端还是旧的，重启 DSH 即可。
+
+### 更新
+
+- **GitHub 安装**：先 remove 再 add（或直接带新 commit 重新 add）：
+
+```bash
+dsh plugin --profile desktop remove dsh-provider-studio
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
+```
+
+- **本地 link 安装**：`git pull` 后按需构建：
+
+```bash
+cd ~/code/dsh-provider-studio
+npm install            # 只有改了依赖或首次开发时才需要
+npm run build:client   # 只有改了 src/client/ 时才需要；生成的 client.js 要保留
+```
+
+改完重启 DSH。Host 端 `index.js` / `contract.js` 是手写 ESM，无需构建。
+
+### 卸载
+
+```bash
+dsh plugin --profile <profile> remove dsh-provider-studio
+```
+
+重启 DSH 后官方 Models 页恢复。
+
+## 使用
+
+### 打开
+
+设置 →「供应商管理」。页面里列出当前 profile 的所有 `llm-pi-ai` 供应商，外加内置的 **DeepSeek 官方**（来自 `llm-deepseek`，可编辑、不可删除）。
+
+### 新增供应商
+
+1. 列表底部点「+ 新增供应商」。
+2. 选一个模板（按分组浏览或直接搜索名称/域名），或选「自定义供应商」从空白开始。
+3. 填写表单：
+   - **显示名称**：列表里显示的名字，留空则用路由 ID。
+   - **路由 ID**：配置里的唯一键，只能包含字母、数字、`.`、`_`、`-`，创建后不建议改。
+   - **协议**：OpenAI 兼容（`/chat/completions`）、OpenAI Responses（`/responses`）、Anthropic Messages（`/messages`）。
+   - **Base URL**：例如 `https://api.example.com/v1`。
+   - **API Key**：可以留空，稍后在详情页补。
+   - **首个模型 ID**：至少填一个，创建后再增删。
+4. 点「创建」，成功后自动进入该供应商的详情页。
+
+### 填写 / 更换密钥
+
+- 点 API Key 输入框即可编辑：已配置的密钥会先显示为掩码，聚焦后变成真实值，改完回车保存。
+- 输入框右侧三个动作：复制、显示/隐藏、清除（有值时）；清除会先弹确认。
+- 密钥只写进 DSH 凭据服务，不写进 `llm-pi-ai` 配置，也不落本插件的文件。
+
+### 拉取模型
+
+点模型区右上角的「拉取模型」，插件会用当前 Base URL + 密钥请求 `GET {baseURL}/models`，弹窗里搜索、全选或逐个勾选，点「加入所选」并入模型表——注意这时还只是草稿，点「保存」才写盘。
+
+### 测试连通性
+
+每个模型行右侧的「测试」按钮会发一个**真实**最小请求：
+
+- 聊天类协议发 `max_tokens: 1`，Responses 类发 `max_output_tokens: 16`，Anthropic 类同理，20 秒超时；
+- 成功显示 `✓ 延迟`，失败显示红色失败徽章，鼠标悬停看具体 HTTP 错误；
+- 结果约 6 秒后自动消失。
+
+### 编辑 / 删除模型
+
+点模型 ID 或铅笔图标打开弹窗：模型 ID、显示名、上下文窗口、最大输出、输入模态（文本 / 图片），可以重置表单。删除模型只改草稿，保存后才生效。
+
+### 重命名 / 删除供应商
+
+- 点标题就地改名，回车确认，Esc 取消。
+- 标题右侧 `…` →「重命名」/「删除供应商」；删除前会弹确认：
+
+![删除确认](docs/confirm.png)
+
+### 保存规则
+
+- 底部「保存」在有改动时才可点，左侧会提示「有未保存的更改」；`Cmd/Ctrl+S` 等效。
+- 「重新加载」丢弃草稿、重新读一次磁盘配置。
+- 有未保存改动时返回列表，会先确认是否放弃。
+- 保存成功/失败都以右下角 Toast 提示；写入未真正落盘会单独报错，不会假装成功。
+
+## 功能细节
 
 ### 供应商列表
 
@@ -85,7 +214,7 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 - 需要专用 SDK 的厂商（Google、Bedrock、Azure 等）不收录，因为 DSH 的 `llm-pi-ai` 只支持上面三种协议。
 - 「常用」分组里还带一个「自定义供应商」入口，用于任意 OpenAI 兼容端点。
 
-### 与官方 Models 设置页的关系
+## 与官方 Models 设置页的关系
 
 `cordis.patch.yml` 除了插入本插件，还带一行：
 
@@ -102,67 +231,6 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 
 代价：官方 Models 页里的「DeepSeek 账号登录」入口、以及官方对内置 `llm-deepseek` 供应商的编辑入口会一并消失；内置 DeepSeek 的密钥 / Base URL / 模型表改由本插件编辑。
 
-## 安装
-
-前置：DSH 桌面版（本插件按 `0.2.1-rc.5` 实测）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
-
-### 方式一：直接从 GitHub 安装（推荐）
-
-```bash
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
-```
-
-- `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
-- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git`。
-- 想固定版本就带 commit：`github:realchendahuang/dsh-provider-studio#<commit-sha>`。
-- pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
-
-### 方式二：克隆到本地（开发 / 改代码）
-
-```bash
-git clone https://github.com/realchendahuang/dsh-provider-studio.git ~/code/dsh-provider-studio
-dsh plugin --profile desktop add ~/code/dsh-provider-studio
-```
-
-- 本地目录以 pnpm `link:` 依赖写入 profile，不复制文件；之后 `git pull`、改源码都不用重新 `add`。
-
-### 重启 DSH 后生效
-
-安装或更新后需要**完整退出并重新启动 DSH**，而不是只刷新窗口：
-
-- Host 端代码（`index.js`）只在 DSH 启动时加载，刷新页面 / 重开设置不会加载新的 Host 代码；
-- 刷新窗口只会重载 `client.js`（浏览器端）。
-- 首次安装后如果「测试」提示需要重启 DSH（或报 404 / transport failure），说明 Host 端还是旧的，重启 DSH 即可；界面里也会显示这条提示。
-
-重启后打开 设置 →「供应商管理」（英文界面为 Providers）。
-
-### 更新
-
-- **GitHub 安装**：先 remove 再 add（或直接带新 commit 重新 add）：
-
-```bash
-dsh plugin --profile desktop remove dsh-provider-studio
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
-```
-
-- **本地 link 安装**：`git pull` 后按需构建：
-
-```bash
-cd ~/code/dsh-provider-studio
-npm install            # 只有改了依赖或首次开发时才需要
-npm run build:client   # 只有改了 src/client/ 时才需要；生成的 client.js 要保留
-```
-
-改完重启 DSH。Host 端 `index.js` / `contract.js` 是手写 ESM，无需构建。
-
-### 卸载
-
-```bash
-dsh plugin --profile <profile> remove dsh-provider-studio
-```
-
-重启 DSH 后官方 Models 页恢复。
-
 ## 实现要点
 
 - **读取时直接解析 profile patch 文档原文**，而不是 `settings.describe()` 的 schema 投影：投影会丢掉 schema 未声明的字段（每个模型的 `reasoningEfforts` 档位、`compat` 等），保存时就会悄悄丢失。
@@ -170,6 +238,39 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 - 密钥不落本插件：权威副本始终在 DSH 凭据服务，插件只通过 `credentials` 服务读写。
 - Host ↔ Client 走 Typert Remote（`providerPanel` 服务），不注册全局 HTTP 路由。
 - 没有遥测；除用户主动触发的「测试」「拉取模型」会请求所配置的供应商端点外，插件不发起外部网络请求。
+
+## 常见问题
+
+**设置里没有「供应商管理」**
+
+1. 确认装到了你正在用的 profile：`dsh plugin --profile desktop why dsh-provider-studio`；
+2. 完全退出 DSH 再打开（刷新窗口不够）；
+3. 检查 profile 的 `cordis.patch.yml` 里有没有 `- id: dsh-provider-studio` + `disabled: true`（可能被其他工具禁用），删掉后重启。
+
+**打开设置整页白屏 / 报 `Failed to load plugins`**
+
+通常是 profile 里的插件条目和磁盘上的 `client.js` 版本对不上（改包名、半更新状态），或者是某个插件加载直接抛错。先重启；仍然不行就 remove 再 add 一次。
+
+**「测试」报 404 或 `transport failure`**
+
+Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
+
+**密钥显示为空**
+
+这个供应商的密钥来自环境变量（`$SOME_API_KEY`），凭据服务里没有真实值，插件不会伪造明文；可以在本页直接粘贴一个新密钥覆盖。
+
+**官方 Models 页不见了**
+
+预期行为，见「与官方 Models 设置页的关系」。改 `cordis.patch.yml` 一行即可恢复。
+
+## 已知限制
+
+- Host 端改动必须重启 DSH 才生效（见「安装」）。
+- 只管理 `llm-pi-ai` 的供应商（外加内置 `llm-deepseek`）；不支持需要专用 SDK 的协议。
+- 新建供应商至少要有一个模型条目。删除供应商、清除密钥、放弃未保存修改都会先弹出二次确认。
+- 模型表只编辑常用字段，`reasoningEfforts` / `compat` 等高级字段不在表格里，但保存时原样保留。
+- 模板与模型 ID 只是预填建议，不代表账户一定有权限调用。
+- 按 DSH `0.2.1-rc.5` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配。
 
 ## 数据来源与致谢
 
@@ -218,15 +319,6 @@ npm run build:client   # 改了 src/client/ 之后需要
 - Host 端改动（`index.js` / `contract.js`）必须重启 DSH 才能验证；只改客户端刷新窗口即可。
 - 提交信息用英文祈使句，例如 `Fix key reveal when the secret is empty`。
 - 版本变化记录在 [CHANGELOG.md](CHANGELOG.md)。
-
-## 已知限制
-
-- Host 端改动必须重启 DSH 才生效（见「安装」）。
-- 只管理 `llm-pi-ai` 的供应商（外加内置 `llm-deepseek`）；不支持需要专用 SDK 的协议。
-- 新建供应商至少要有一个模型条目。删除供应商、清除密钥、放弃未保存修改都会先弹出二次确认。
-- 模型表只编辑常用字段，`reasoningEfforts` / `compat` 等高级字段不在表格里，但保存时原样保留。
-- 模板与模型 ID 只是预填建议，不代表账户一定有权限调用。
-- 按 DSH `0.2.1-rc.5` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配。
 
 ## Star History
 
