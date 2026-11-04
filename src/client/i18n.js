@@ -180,6 +180,8 @@ export const ZH = {
   advThinkingOff: '关闭',
   advReasoningEffort: '推理等级',
   advMaxTokens: '输出上限',
+  advMaxRequestImages: '单请求图片张数',
+  advOffloadCountQuantum: '离屏回收粒度',
 
 }
 
@@ -360,5 +362,7 @@ export const EN = {
   advThinkingOff: 'Disabled',
   advReasoningEffort: 'Reasoning level',
   advMaxTokens: 'Output cap',
+  advMaxRequestImages: 'Images per request',
+  advOffloadCountQuantum: 'Offload count quantum',
 
 }

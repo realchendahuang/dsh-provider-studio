@@ -1300,6 +1300,29 @@ function AdvancedCard({ t, api, state, onChange, disabled }) {
                   onChange={(event) => set({ maxRequestImageBytes: event.target.value })}
                 />
               </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advMaxRequestImages')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.maxRequestImages}
+                  placeholder="50"
+                  aria-label={t('advMaxRequestImages')}
+                  disabled={disabled}
+                  onChange={(event) => set({ maxRequestImages: event.target.value })}
+                />
+              </div>
+              <div className="dpp-field">
+                <span className="dpp-fieldLabel">{t('advOffloadCountQuantum')}</span>
+                <input
+                  className="dpp-input"
+                  inputMode="numeric"
+                  value={state.imageOffloadCountQuantum}
+                  aria-label={t('advOffloadCountQuantum')}
+                  disabled={disabled}
+                  onChange={(event) => set({ imageOffloadCountQuantum: event.target.value })}
+                />
+              </div>
             </div>
           </AdvancedSection>
         </div>

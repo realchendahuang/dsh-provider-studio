@@ -135,8 +135,8 @@ function applyDeepseekAdvanced(next, patch) {
 const ADVANCED_KEYS = [
   'headers', 'compat', 'reasoning', 'defaultContextWindow', 'defaultMaxTokens', 'defaultInput',
   'transport', 'cacheRetention', 'timeoutMs', 'websocketConnectTimeoutMs', 'streamIdleTimeoutMs',
-  'maxRequestImageBytes', 'requestImagePixelBudget', 'requestImageMaxBytes', 'retryPolicy',
-  'thinkingBudgets',
+  'maxRequestImageBytes', 'requestImagePixelBudget', 'requestImageMaxBytes',
+  'maxRequestImages', 'imageOffloadCountQuantum', 'retryPolicy', 'thinkingBudgets',
 ]
 
 // ---------------------------------------------------------------------------

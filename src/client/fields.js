@@ -292,6 +292,8 @@ export const ADVANCED_FIELDS = [
   'maxRequestImageBytes',
   'requestImagePixelBudget',
   'requestImageMaxBytes',
+  'maxRequestImages',
+  'imageOffloadCountQuantum',
   'retryPolicy',
   'thinkingBudgets',
 ]
@@ -321,6 +323,8 @@ export function readAdvanced(profile) {
     maxRequestImageBytes: numberText(source.maxRequestImageBytes),
     requestImagePixelBudget: numberText(source.requestImagePixelBudget),
     requestImageMaxBytes: numberText(source.requestImageMaxBytes),
+    maxRequestImages: numberText(source.maxRequestImages),
+    imageOffloadCountQuantum: numberText(source.imageOffloadCountQuantum),
     retryMode: typeof retry.mode === 'string' ? retry.mode : '',
     maxRetries: numberText(retry.maxRetries),
     thinkingBudgets: Object.fromEntries(
@@ -349,6 +353,8 @@ export function advancedIsEmpty(state) {
     'maxRequestImageBytes',
     'requestImagePixelBudget',
     'requestImageMaxBytes',
+    'maxRequestImages',
+    'imageOffloadCountQuantum',
   ]) {
     if (state[field] !== '') return false
   }
@@ -373,6 +379,8 @@ export function advancedCount(state) {
     'maxRequestImageBytes',
     'requestImagePixelBudget',
     'requestImageMaxBytes',
+    'maxRequestImages',
+    'imageOffloadCountQuantum',
   ]) {
     if (state[field] !== '') count += 1
   }
@@ -405,6 +413,8 @@ export function buildAdvancedPatch(state) {
     'maxRequestImageBytes',
     'requestImagePixelBudget',
     'requestImageMaxBytes',
+    'maxRequestImages',
+    'imageOffloadCountQuantum',
   ]) {
     patch[field] = positiveNumber(state[field])
   }

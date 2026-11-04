@@ -2991,6 +2991,8 @@ window.__ModuleLoader__.load({
         maxRequestImageBytes: numberText(source.maxRequestImageBytes),
         requestImagePixelBudget: numberText(source.requestImagePixelBudget),
         requestImageMaxBytes: numberText(source.requestImageMaxBytes),
+        maxRequestImages: numberText(source.maxRequestImages),
+        imageOffloadCountQuantum: numberText(source.imageOffloadCountQuantum),
         retryMode: typeof retry.mode === "string" ? retry.mode : "",
         maxRetries: numberText(retry.maxRetries),
         thinkingBudgets: Object.fromEntries(
@@ -3017,7 +3019,9 @@ window.__ModuleLoader__.load({
         "streamIdleTimeoutMs",
         "maxRequestImageBytes",
         "requestImagePixelBudget",
-        "requestImageMaxBytes"
+        "requestImageMaxBytes",
+        "maxRequestImages",
+        "imageOffloadCountQuantum"
       ]) {
         if (state[field] !== "") count += 1;
       }
@@ -3046,7 +3050,9 @@ window.__ModuleLoader__.load({
         "streamIdleTimeoutMs",
         "maxRequestImageBytes",
         "requestImagePixelBudget",
-        "requestImageMaxBytes"
+        "requestImageMaxBytes",
+        "maxRequestImages",
+        "imageOffloadCountQuantum"
       ]) {
         patch[field] = positiveNumber(state[field]);
       }
@@ -4076,6 +4082,27 @@ window.__ModuleLoader__.load({
           "aria-label": t("advMaxRequestImageBytes"),
           disabled,
           onChange: (event) => set({ maxRequestImageBytes: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advMaxRequestImages")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.maxRequestImages,
+          placeholder: "50",
+          "aria-label": t("advMaxRequestImages"),
+          disabled,
+          onChange: (event) => set({ maxRequestImages: event.target.value })
+        }
+      )), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-field" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldLabel" }, t("advOffloadCountQuantum")), /* @__PURE__ */ import_react2.default.createElement(
+        "input",
+        {
+          className: "dpp-input",
+          inputMode: "numeric",
+          value: state.imageOffloadCountQuantum,
+          "aria-label": t("advOffloadCountQuantum"),
+          disabled,
+          onChange: (event) => set({ imageOffloadCountQuantum: event.target.value })
         }
       ))))) : null);
     }
@@ -5853,7 +5880,9 @@ window.__ModuleLoader__.load({
       advThinkingOn: "\u5F00\u542F",
       advThinkingOff: "\u5173\u95ED",
       advReasoningEffort: "\u63A8\u7406\u7B49\u7EA7",
-      advMaxTokens: "\u8F93\u51FA\u4E0A\u9650"
+      advMaxTokens: "\u8F93\u51FA\u4E0A\u9650",
+      advMaxRequestImages: "\u5355\u8BF7\u6C42\u56FE\u7247\u5F20\u6570",
+      advOffloadCountQuantum: "\u79BB\u5C4F\u56DE\u6536\u7C92\u5EA6"
     };
     var EN = {
       nav: "Providers",
@@ -6031,7 +6060,9 @@ window.__ModuleLoader__.load({
       advThinkingOn: "Enabled",
       advThinkingOff: "Disabled",
       advReasoningEffort: "Reasoning level",
-      advMaxTokens: "Output cap"
+      advMaxTokens: "Output cap",
+      advMaxRequestImages: "Images per request",
+      advOffloadCountQuantum: "Offload count quantum"
     };
 
     // src/client/entry.jsx

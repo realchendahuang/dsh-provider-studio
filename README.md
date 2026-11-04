@@ -51,7 +51,7 @@ dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
 
 ## 安装
 
-前置：DSH 桌面版（本插件按 `0.2.1-rc.5` 实测）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
+前置：DSH 桌面版（本插件按 `0.2.1-rc.5` 与 `0.2.2-rc.1` 实测）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
 
 DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`，所以命令里的 `--profile` 要和你实际启动的那个一致。
 
@@ -181,7 +181,7 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 - **请求头**：自定义 HTTP 头，网关做鉴权 / 路由时常用；
 - **兼容性**：路由级 `compat`，对整条路由生效；
 - **连接与重试**：传输方式（auto / sse / websocket…）、缓存保留、请求超时、流空闲超时、WebSocket 连接超时、重试策略与次数；
-- **图片预算**：单图像素预算、单图字节上限、请求图片总量。
+- **图片预算**：单图像素预算、单图字节上限、请求图片总量、单请求图片张数、离屏回收粒度。
 
 内置 **DeepSeek 官方**行有自己的一组参数：思考模式、推理等级、输出上限、缺省上下文、流空闲超时、重试策略。
 
@@ -235,7 +235,7 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 - 收在详情页的「高级」里，展开后按组呈现，未设置的项一律留空（= 沿用 pi-ai 默认），设置过的项在折叠时计入标题旁的数字。
 - 路由级 `compat` 与模型级 `compat` 是两层：模型上的覆盖优先级更高。界面按当前协议过滤可选项，换了协议不会把旧协议的开关偷偷写回去。
 - 所有数值字段按 pi-ai 的约束校验（正整数、枚举取值、`retryPolicy.mode` 必填），不合法的值在保存时直接报错。
-- 支持的字段：`headers`、`compat`、`reasoning`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`thinkingBudgets`、`transport`、`cacheRetention`、`timeoutMs`、`streamIdleTimeoutMs`、`websocketConnectTimeoutMs`、`maxRequestImageBytes`、`requestImagePixelBudget`、`requestImageMaxBytes`、`retryPolicy`。
+- 支持的字段：`headers`、`compat`、`reasoning`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`thinkingBudgets`、`transport`、`cacheRetention`、`timeoutMs`、`streamIdleTimeoutMs`、`websocketConnectTimeoutMs`、`maxRequestImageBytes`、`requestImagePixelBudget`、`requestImageMaxBytes`、`maxRequestImages`、`imageOffloadCountQuantum`、`retryPolicy`。其中 `maxRequestImages` / `imageOffloadCountQuantum` 是 DSH `0.2.2` 才有的字段，旧版本里留空即可。
 
 ### 从端点拉取模型
 
@@ -308,7 +308,7 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 - 新建供应商至少要有一个模型条目。删除供应商、清除密钥、放弃未保存修改都会先弹出二次确认。
 - `modelOverrides` 还没有界面：使用内置目录的路由（没有写 `models` 列表）只能整体继承目录，想只改其中一个模型的档位需要手写 `cordis.patch.yml`。
 - 模板与模型 ID 只是预填建议，不代表账户一定有权限调用。
-- 按 DSH `0.2.1-rc.5` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配。
+- 按 DSH `0.2.1-rc.5` / `0.2.2-rc.1` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配（例如 `0.2.2` 新增的两个图片字段只在 `0.2.2+` 生效）。
 
 ## 数据来源与致谢
 
