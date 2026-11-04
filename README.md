@@ -163,7 +163,9 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 - 点标题就地改名，回车确认，Esc 取消。
 - 标题右侧 `…` →「重命名」/「删除供应商」；删除前会弹确认：
 
-![删除确认](docs/confirm.png)
+|  |
+|:---:|
+| ![删除确认](docs/confirm.png)<br>删除供应商前的二次确认（清除密钥、放弃修改同理） |
 
 ### 保存规则
 
