@@ -3483,7 +3483,7 @@ window.__ModuleLoader__.load({
               checked,
               onChange: () => toggle(model.id)
             }
-          ), /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-checkbox${checked ? " is-on" : ""}`, "aria-hidden": "true" }, checked ? /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "check", size: 11, strokeWidth: 2.8 }) : null), /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-pickMain" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-pickId", title: model.id }, model.id), model.name && model.name !== model.id ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-pickName" }, model.name) : null), context !== "" ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge dpp-badgeMono" }, context) : null);
+          ), /* @__PURE__ */ import_react2.default.createElement("span", { className: `dpp-checkbox${checked ? " is-on" : ""}`, "aria-hidden": "true" }, checked ? /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "check", size: 11, strokeWidth: 2.8 }) : null), /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-pickMain" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-pickId", title: model.name && model.name !== model.id ? `${model.id} \xB7 ${model.name}` : model.id }, model.id)), context !== "" ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-badge dpp-badgeMono" }, context) : null);
         }))
       );
     }
@@ -4570,15 +4570,14 @@ window.__ModuleLoader__.load({
 
     /* ------------------------------------------------------------------ picker */
     .dpp-pickList{flex:1;min-height:0;overflow:auto;padding:0 8px 8px;scrollbar-width:thin}
-    .dpp-pickRow{display:flex;align-items:center;gap:10px;min-height:38px;padding:0 10px;border-radius:var(--dpp-r-sm);cursor:pointer;transition:background var(--dpp-t-fast)}
+    .dpp-pickRow{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:var(--dpp-r-sm);cursor:pointer;transition:background var(--dpp-t-fast)}
     .dpp-pickRow:hover{background:var(--dpp-surface2)}
     .dpp-pickRow.is-selected{background:var(--dpp-brandSoft)}
     .dpp-checkbox{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:none;border:1.5px solid var(--dpp-line2);border-radius:4.5px;background:var(--dpp-surface);color:#fff;transition:background var(--dpp-t),border-color var(--dpp-t)}
     .dpp-pickRow:hover .dpp-checkbox{border-color:var(--dpp-fg4)}
     .dpp-checkbox.is-on{background:var(--dpp-brand);border-color:var(--dpp-brand);animation:dppPop var(--dpp-t) var(--dpp-ease)}
-    .dpp-pickMain{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+    .dpp-pickMain{display:flex;align-items:center;min-width:0;flex:1}
     .dpp-pickId{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--dpp-mono);font-size:12px;letter-spacing:-.01em}
-    .dpp-pickName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--dpp-fg3)}
     .dpp-pickEmpty{display:flex;align-items:center;justify-content:center;gap:8px;padding:36px 0;color:var(--dpp-fg3);font-size:12px}
 
     /* -------------------------------------------------------------------- tpls */

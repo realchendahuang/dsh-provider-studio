@@ -953,10 +953,9 @@ function DiscoverModal({ open, t, result, onClose, onAdd, busy }) {
                 {checked ? <Icon name="check" size={11} strokeWidth={2.8} /> : null}
               </span>
               <span className="dpp-pickMain">
-                <span className="dpp-pickId" title={model.id}>{model.id}</span>
-                {model.name && model.name !== model.id
-                  ? <span className="dpp-pickName">{model.name}</span>
-                  : null}
+                <span className="dpp-pickId" title={model.name && model.name !== model.id ? `${model.id} · ${model.name}` : model.id}>
+                  {model.id}
+                </span>
               </span>
               {context !== '' ? <span className="dpp-badge dpp-badgeMono">{context}</span> : null}
             </label>
