@@ -13,8 +13,10 @@ export const CSS = `
   --dpp-fg:var(--dsw-alias-label-primary,#17181a);
   --dpp-fg2:var(--dsw-alias-label-secondary,#5b6070);
   --dpp-fg3:var(--dsw-alias-label-tertiary,#8a8f9d);
-  /* quaternary is not exported by every theme; derive it so both themes stay legible */
-  --dpp-fg4:color-mix(in srgb, var(--dpp-fg) 42%, transparent);
+  /* quaternary is not exported by every theme; derive it. 62% keeps the 11px
+     hint text at >=4.5:1 against both the light (4.96:1) and dark (6.5:1)
+     surfaces, which the previous 42% mix missed (2.7:1). */
+  --dpp-fg4:color-mix(in srgb, var(--dpp-fg) 62%, transparent);
   --dpp-line:var(--dsw-alias-border-l2,#e3e5ea);
   --dpp-line1:var(--dsw-alias-border-l1,#eceef2);
   --dpp-line2:var(--dsw-alias-border-l4,#c8ccd5);

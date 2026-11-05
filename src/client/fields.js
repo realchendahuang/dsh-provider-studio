@@ -33,7 +33,7 @@ export function levelKey(level) {
   return LEVEL_KEYS[level] || level
 }
 
-/** `低 · low`: a translated name plus the wire spelling the adapter expects. */
+/** `Low · low`: a translated name plus the wire spelling the adapter expects. */
 export function levelLabel(t, level) {
   return `${t(levelKey(level))} · ${level}`
 }
@@ -264,8 +264,13 @@ export const TRANSPORTS = ['auto', 'sse', 'websocket', 'websocket-cached']
 /** Cache-retention spellings pi-ai accepts. */
 export const CACHE_RETENTIONS = ['none', 'short', 'long']
 
-/** Retry modes pi-ai accepts. */
+/** Retry modes pi-ai accepts, with the dictionary key each one renders with. */
 export const RETRY_MODES = ['normal', 'always']
+
+export const RETRY_MODE_LABEL_KEYS = {
+  normal: 'advRetryNormal',
+  always: 'advRetryAlways',
+}
 
 /** Every provider-level field this editor owns; a `null` in a patch removes it. */
 const REQUEST_FIELDS = [

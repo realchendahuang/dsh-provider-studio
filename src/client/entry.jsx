@@ -5,6 +5,7 @@ import { PACKAGE, SERVICE_KEY, INVOCATIONS } from '../../contract.js'
 import { PanelPage } from './app.jsx'
 import { CSS } from './styles.js'
 import { NS, ZH, EN } from './i18n.js'
+import { normalizeFailure } from './lib/errors.js'
 
 export const name = PACKAGE
 
@@ -74,19 +75,20 @@ export function apply(ctx) {
     }
   }, 'dsh-provider-studio: remote')
 
+  // Every failure becomes an Error carrying `code`/`params`/`detail`, so the
+  // views can translate `err.<CODE>` and only fall back to the Host message for
+  // codes this client does not know yet.
   const call = async (method, args) => {
     if (remote === null || typeof remote[method] !== 'function') {
-      throw new Error('providerPanel 远程服务尚未挂载，请稍后重试或重启 DSH')
+      throw normalizeFailure({ code: 'REMOTE_UNAVAILABLE' })
     }
     const reply = await remote[method](args || {})
     if (reply === null || typeof reply !== 'object' || reply.ok !== true) {
-      const failure = reply && reply.error
-      const message = failure && (failure.message || failure.error || JSON.stringify(failure))
-      throw new Error(message || '调用失败')
+      throw normalizeFailure(reply)
     }
     const value = reply.value
     if (value === null || typeof value !== 'object' || value.ok !== true) {
-      throw new Error((value && value.error) || '调用失败')
+      throw normalizeFailure(value)
     }
     return value
   }
@@ -97,7 +99,7 @@ export function apply(ctx) {
   slots.inject('settings.section', () => {
     return slots.register(
       { name: 'settings.section', id: PACKAGE, order: 13, label: () => t('nav'), locale: NS },
-      () => React.createElement(PanelPage, { t, call }),
+      () => React.createElement(PanelPage, { t, call, locale }),
     )
   })
 }
