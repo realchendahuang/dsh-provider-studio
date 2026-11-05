@@ -1,0 +1,42 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: release gate + host tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The gate needs the repo's own devDependencies: esbuild (in-memory
+      # rebuild of client.js) and yaml (cordis.patch.yml parsing).
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Release gate
+        run: npm run check
+
+      - name: Host unit tests
+        run: |
+          if [ -d test ]; then
+            npm test
+          else
+            echo "no test/ directory yet — skipping host tests"
+          fi

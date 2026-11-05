@@ -1,0 +1,18 @@
+# Keep the committed browser artifact out of language statistics and diffs:
+# client.js is rebuilt from src/client/ and scripts/check.mjs compares the
+# committed file with a fresh in-memory build byte for byte.
+client.js                linguist-generated=true -diff
+src/client/icons.js      linguist-generated=true
+src/client/ui-icons.jsx  linguist-generated=true
+
+# Raster and font assets are binary.
+*.png   binary
+*.webp  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+
+# One line-ending policy everywhere: client.js must be comparable byte for byte,
+# and a CRLF checkout on Windows would otherwise fail the release gate.
+* text=auto eol=lf
+*.svg text eol=lf
