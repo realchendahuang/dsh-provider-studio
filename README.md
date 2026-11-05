@@ -385,6 +385,7 @@ python3 scripts/fetch-favicons.py  # 为缺 logo 的模板抓官网 favicon（�
 - `client.js` 由 `scripts/build-client.mjs` 用 esbuild 打成 CJS，再包进 `window.__ModuleLoader__.load` 的 factory；React 由 DSH 的模块表提供，不打进 bundle。Node 22 + esbuild 0.25（`package-lock` 锁定）可复现，构建失败不会留下半个 `client.js`（临时文件 + rename）。
 - `scripts/check.mjs` 不写盘：它调用 `build-client.mjs` 暴露的同一套 esbuild 配置在内存里重建 `client.js`，与提交产物逐字节比对；版本、`engines.dsh` 上界、`files` 白名单、`cordis.patch.yml`、模板↔图标孤儿、`node --check`、体积预算也都在这一步。`--no-build` 可跳过重建比对（例如没装 `node_modules`）。CI（`.github/workflows/check.yml`）跑 `npm ci` → `npm run check` → `npm test`。
 - `src/client/icons.js`、`src/client/ui-icons.jsx`、`dist/` 都是生成物，不要手改；`client.js` 是例外——它是需要提交的发布产物。
+- 图标换过格式后要先跑测量：`python3 scripts/icon-frames.py`（透明留白 → 光学缩放）和 `python3 scripts/icon-tones.py`（明暗分类 → 浅/深底板），再 `node scripts/gen-icons.mjs`；两个 Python 脚本需要 Pillow。
 - 图标策略：`icons/` 是构建期素材，不是运行时资源。`gen-icons.mjs` 把 SVG 与 48×48 WebP 内联成 `src/client/icons.js` 的 data URL，再被 esbuild 打进 `client.js`；`files` 白名单里没有 `icons/`。PNG 已统一转成 WebP（原 PNG 见 git 历史），新增 favicon 要先转 48px WebP 再跑 `npm run gen:icons`。
 - `scripts/fetch-favicons.py` 读取本机的 `/tmp/providers.json` 与 `/tmp/models-dev.json` 缓存并写入 `icons/`，不是安装或构建的必需步骤。
 - 贡献者用 npm（仓库带 `package-lock.json`）；用户安装时由 DSH 用 pnpm 拉包，两条链路互不影响。
