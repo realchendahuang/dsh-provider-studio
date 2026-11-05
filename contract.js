@@ -19,6 +19,8 @@ export const METHODS = [
   'discoverModels',
   'testModel',
   'exportProvider',
+  // v1.2: user-initiated secret reveal; `getProvider` no longer carries one.
+  'revealKey',
 ]
 
 // The strict-codec contract changed between DSH 0.1.x (registry validates
@@ -38,9 +40,15 @@ const argsParser = (value) => {
   return value
 }
 
+// v1.2 envelope: `{ ok:true, ...payload }` or
+// `{ ok:false, code, message, params?, detail? }`. Failures must carry the
+// stable machine code the Client i18n table maps; successes are free-form.
 const envelopeParser = (value) => {
   if (value === null || typeof value !== 'object' || typeof value.ok !== 'boolean') {
     throw new TypeError('expected an { ok, ... } envelope')
+  }
+  if (value.ok === false && typeof value.code !== 'string') {
+    throw new TypeError('expected a string `code` on a failed envelope')
   }
   return value
 }
