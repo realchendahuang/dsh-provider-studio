@@ -112,7 +112,7 @@ export function TemplatePicker({ t, onPick, onBack }) {
                   className="dpp-tplCard"
                   onClick={() => onPick(template)}
                 >
-                  <ProviderMark iconKey={template.icon} size={26} />
+                  <ProviderMark iconKey={template.icon} label={templateLabel(template, t)} size={26} />
                   <span className="dpp-tplBody">
                     <span className="dpp-tplName">{templateLabel(template, t)}</span>
                     <span className="dpp-tplHost">{hostOf(template.baseURL) || template.api || '—'}</span>

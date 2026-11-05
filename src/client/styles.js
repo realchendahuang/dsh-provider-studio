@@ -185,9 +185,26 @@ export const CSS = `
 .dpp-dirty.is-on{opacity:1;color:var(--dpp-warn)}
 
 /* ------------------------------------------------------------------- marks */
-.dpp-mark{display:inline-flex;align-items:center;justify-content:center;flex:none;border-radius:6px;overflow:hidden;background:var(--dpp-surface)}
+.dpp-mark{display:inline-flex;align-items:center;justify-content:center;flex:none;border-radius:6px;overflow:hidden;background:transparent}
 .dpp-mark img{display:block;width:100%;height:100%;object-fit:contain}
-.dpp-markFallback{background:var(--dpp-fill);color:var(--dpp-fg3);box-shadow:inset 0 0 0 1px var(--dpp-line1)}
+/* Logos whose glyph is near-black need a light plate on the dark panel (and
+   near-white ones need a dark plate on the light panel); the tone is measured
+   from the pixels by scripts/icon-tones.py. */
+/* A near-black logo only needs help on the dark panel; a near-white one only on
+   the light panel. Paint the plate in exactly that theme so the other theme
+   keeps the logo on the bare surface. */
+.dpp-root[data-dpp-scheme="dark"] .dpp-mark.is-onLight{background:#f4f5f7;box-shadow:inset 0 0 0 1px rgba(15,17,21,.08)}
+.dpp-root[data-dpp-scheme="light"] .dpp-mark.is-onDark{background:#26272b;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+/* App-icon style logos carry their own opaque square, so a plate behind them
+   would be invisible; a hairline ring keeps the edge readable on a panel of
+   the same lightness. */
+.dpp-mark.is-solid{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dpp-fg) 18%,transparent)}
+/* Monochrome vendor marks are painted through a mask so the mark follows the
+   theme's secondary text colour instead of a fixed grey that fades into the
+   dark panel. */
+.dpp-markMask{display:block;background-color:var(--dpp-fg2);-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:contain;mask-size:contain}
+.dpp-markFallback{background:var(--dpp-fill);color:var(--dpp-fg2);box-shadow:inset 0 0 0 1px var(--dpp-line1)}
+.dpp-markInitial{font-weight:600;line-height:1;letter-spacing:0}
 .dpp-markAdd{background:var(--dpp-brandSoft);color:var(--dpp-brand);box-shadow:none}
 
 /* -------------------------------------------------------------------- list */

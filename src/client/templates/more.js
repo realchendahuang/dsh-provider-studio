@@ -94,7 +94,7 @@ export const MORE_TEMPLATES = [
   { id: 'longcat', icon: 'longcat', label: 'LongCat', group: MORE, displayName: 'LongCat', api: 'openai-completions', baseURL: 'https://api.longcat.chat/openai' },
   { id: 'lowrouter', icon: 'lowrouter', label: 'LowRouter', group: MORE, displayName: 'LowRouter', api: 'openai-completions', baseURL: 'https://api.lowrouter.ai/v1' },
   { id: 'lucidquery', label: 'LucidQuery', group: MORE, displayName: 'LucidQuery', api: 'openai-completions', baseURL: 'https://api.lucidquery.com/v1' },
-  { id: 'lynkr', icon: 'lynkr', label: 'Lynkr', group: MORE, displayName: 'Lynkr', api: 'openai-completions', baseURL: 'http://127.0.0.1:8081/v1' },
+  { id: 'lynkr', label: 'Lynkr', group: MORE, displayName: 'Lynkr', api: 'openai-completions', baseURL: 'http://127.0.0.1:8081/v1' },
   { id: 'meganova', icon: 'meganova', label: 'Meganova', group: MORE, displayName: 'Meganova', api: 'openai-completions', baseURL: 'https://api.meganova.ai/v1' },
   { id: 'melious', icon: 'melious', label: 'Melious', group: MORE, displayName: 'Melious', api: 'openai-completions', baseURL: 'https://api.melious.ai/v1' },
   { id: 'meta', icon: 'meta', label: 'Meta', group: MORE, displayName: 'Meta', api: 'openai-responses', baseURL: 'https://api.meta.ai/v1' },

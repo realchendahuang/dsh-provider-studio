@@ -66,6 +66,54 @@ export function useBeforeUnload(active) {
   }, [active])
 }
 
+/** Follow the harness theme by watching the root element's computed colour.
+ *
+ * Every token in `styles.js` resolves through the theme, so the root's text
+ * colour is dark on the light theme and light on the dark one. Watching the
+ * document element's attributes and the OS preference covers an in-app theme
+ * switch and a system appearance change; the icon set needs it to decide
+ * whether a logo wants a light or a dark plate behind it.
+ */
+export function useColorScheme(rootRef) {
+  const [scheme, setScheme] = React.useState('light')
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const read = () => {
+      const node = rootRef.current
+      if (node === null) return
+      const color = window.getComputedStyle(node).color || ''
+      const parts = color.match(/-?\d*\.?\d+/g)
+      if (parts === null || parts.length < 3) return
+      const channels = parts.slice(0, 3).map(Number)
+      const scale = Math.max(...channels) <= 1.0001 ? 255 : 1
+      const luminance = (0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]) * scale / 255
+      const next = luminance > 0.5 ? 'dark' : 'light'
+      setScheme((previous) => (previous === next ? previous : next))
+    }
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style', 'data-theme', 'data-dsw-theme', 'data-scheme'],
+    })
+    const media = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)')
+      : null
+    if (media !== null && typeof media.addEventListener === 'function') media.addEventListener('change', read)
+    // A theme switch that only swaps CSS variables fires no DOM mutation; a slow
+    // visibility-aware poll keeps the plates honest without a busy loop.
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'visible') read()
+    }, 2000)
+    return () => {
+      observer.disconnect()
+      clearInterval(poll)
+      if (media !== null && typeof media.removeEventListener === 'function') media.removeEventListener('change', read)
+    }
+  }, [rootRef])
+  return scheme
+}
+
 /** The provider editor's load/draft state, collected out of the view.
  *
  * `baseline` is the last saved snapshot as a JSON string; a successful save can

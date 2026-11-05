@@ -68,7 +68,7 @@ export function ProviderList({ t, providers, loading, writable, error, refreshin
               style={{ '--dpp-i': index < 12 ? index : 12 }}
               onClick={() => onOpen(item.route)}
             >
-              <ProviderMark iconKey={providerIcon(item, t)} size={22} />
+              <ProviderMark iconKey={providerIcon(item, t)} label={providerName(item, t)} size={22} />
               <span className="dpp-rowName">{providerName(item, t)}</span>
               <Icon name="chevron-right" size={14} className="dpp-rowChevron" />
             </button>

@@ -14,6 +14,7 @@ Usage: python3 scripts/fetch-favicons.py
 
 import concurrent.futures
 import io
+import ipaddress
 import json
 import os
 import re
@@ -29,6 +30,7 @@ ICONS = os.path.join(ROOT, 'icons')
 TEMPLATES = os.path.join(ROOT, 'src/client/templates')
 
 ICON_SIZE = 48
+CONTENT = 44  # visible mark size inside the canvas (2px breathing room)
 WEBP_OPTIONS = {'quality': 90, 'method': 6, 'alpha_quality': 100}
 
 UA = {
@@ -60,6 +62,15 @@ def candidate_hosts(doc, base):
             continue
         if not host:
             continue
+        # A provider endpoint on localhost or a LAN address has no public logo,
+        # and fetching there would just pull something else's icon (or nothing).
+        try:
+            address = ipaddress.ip_address(host)
+            if address.is_private or address.is_loopback or address.is_reserved:
+                continue
+        except ValueError:
+            if host == 'localhost':
+                continue
         for prefix in ('docs.', 'doc.', 'www.', 'api.', 'api-', 'tinker-docs.', 'tinker.', 'developers.'):
             if host.startswith(prefix):
                 hosts.append(host[len(prefix):])
@@ -134,8 +145,14 @@ def normalise(data):
     colours = image.convert('RGB').getcolors(maxcolors=256)
     if colours is None or len(colours) < 4:
         return None  # blank or single-colour placeholder
+    # Trim the transparent padding favicons ship with: the panel draws these at
+    # 22px, so a mark that fills half the canvas ends up as a speck. Re-centre
+    # the visible mark so it covers CONTENT of CANVAS (see normalize-icons.py).
+    bbox = image.getchannel('A').point(lambda value: 255 if value > 8 else 0).getbbox()
+    if bbox is not None:
+        image = image.crop(bbox)
     width, height = image.size
-    scale = min(ICON_SIZE / width, ICON_SIZE / height, 1.0)
+    scale = min(CONTENT / width, CONTENT / height)
     target = (max(1, round(width * scale)), max(1, round(height * scale)))
     scaled = image if target == image.size else resize_rgba(image, target)
     canvas = Image.new('RGBA', (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
@@ -165,6 +182,8 @@ def work(item):
             if icon is None:
                 continue
             icon.save(os.path.join(ICONS, pid + '.webp'), 'WEBP', **WEBP_OPTIONS)
+            # New rasters need a tone entry for the client's contrast plates.
+            print('  rerun python3 scripts/icon-tones.py after adding favicons', flush=True)
             stale = os.path.join(ICONS, pid + '.png')
             if os.path.exists(stale):
                 os.remove(stale)  # never leave a PNG twin behind

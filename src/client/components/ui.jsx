@@ -1,23 +1,63 @@
 /** Small presentational primitives shared by the panel views. */
 import React from 'react'
 import { Icon } from '../ui-icons.jsx'
-import { PROVIDER_ICONS } from '../icons.js'
+import { PROVIDER_ICONS, PROVIDER_ICON_FRAMES, PROVIDER_ICON_MONO, PROVIDER_ICON_TONES } from '../icons.js'
 
-/** Provider logo, ZCode style: official asset when we have one, a neutral
- *  package glyph when we do not (no invented monograms). */
-export function ProviderMark({ iconKey, size = 24 }) {
-  const src = iconKey !== null && iconKey !== undefined ? PROVIDER_ICONS[iconKey] : null
+/** First letter of a provider name, used when the set has no logo for it. */
+function monogram(label) {
+  const text = String(label === null || label === undefined ? '' : label).trim()
+  const match = text.match(/[\p{L}\p{N}]/u)
+  return match === null ? '' : match[0].toUpperCase()
+}
+
+/** Provider logo: official asset when the set has one, the provider's initial
+ *  when it does not.
+ *
+ *  Theme handling: SVG marks drawn in the neutral grey are rendered through a
+ *  CSS mask so they take the theme's secondary text colour (a fixed grey goes
+ *  dim on the dark panel). Rasters measured as near-black or near-white get a
+ *  contrast plate; every other brand mark keeps its own background-free look. */
+export function ProviderMark({ iconKey, label, size = 24 }) {
+  const key = iconKey === null || iconKey === undefined ? null : String(iconKey)
+  const src = key !== null && Object.prototype.hasOwnProperty.call(PROVIDER_ICONS, key)
+    ? PROVIDER_ICONS[key]
+    : null
   const box = { width: size, height: size }
-  if (src) {
+  if (src !== null) {
+    if (PROVIDER_ICON_MONO.has(key)) {
+      return (
+        <span className="dpp-mark" style={box} aria-hidden="true">
+          <span
+            className="dpp-markMask"
+            style={{ ...box, maskImage: `url("${src}")`, WebkitMaskImage: `url("${src}")` }}
+          />
+        </span>
+      )
+    }
+    const tone = PROVIDER_ICON_TONES[key]
+    const plate = tone === 'onLight' ? ' is-onLight' : tone === 'onDark' ? ' is-onDark' : tone === 'solid' ? ' is-solid' : ''
+    // Logos measured with too much padding are scaled up instead of re-encoded,
+    // so the shared 48px asset stays small and every mark lands at the same size.
+    const frame = PROVIDER_ICON_FRAMES[key]
+    const transform = frame === undefined
+      ? undefined
+      : `scale(${frame.scale}) translate(${frame.x}%, ${frame.y}%)`
     return (
-      <span className="dpp-mark" style={box}>
-        <img src={src} alt="" width={size} height={size} aria-hidden="true" />
+      <span className={`dpp-mark${plate}`} style={box}>
+        <img src={src} alt="" width={size} height={size} aria-hidden="true" style={transform === undefined ? undefined : { transform }} />
       </span>
     )
   }
+  const initial = monogram(label)
   return (
     <span className="dpp-mark dpp-markFallback" style={box} aria-hidden="true">
-      <Icon name="package" size={Math.max(12, Math.round(size * 0.58))} strokeWidth={1.6} />
+      {initial === '' ? (
+        <Icon name="package" size={Math.max(12, Math.round(size * 0.58))} strokeWidth={1.6} />
+      ) : (
+        <span className="dpp-markInitial" style={{ fontSize: Math.max(10, Math.round(size * 0.44)) }}>
+          {initial}
+        </span>
+      )}
     </span>
   )
 }

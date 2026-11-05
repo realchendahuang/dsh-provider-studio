@@ -110,7 +110,7 @@ export function CreateForm({ protocols, t, call, onCancel, onSubmit, busy, initi
           <span>{t('browseTemplates')}</span>
         </button>
         <div className="dpp-subHeadTitle">
-          <ProviderMark iconKey={iconKey} size={24} />
+          <ProviderMark iconKey={iconKey} label={heading} size={24} />
           <h2 className="dpp-pageTitle">{heading}</h2>
         </div>
       </header>

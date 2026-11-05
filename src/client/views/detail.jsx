@@ -12,7 +12,7 @@ import { DiscoverModal } from './discover.jsx'
 import { copyText } from '../lib/clipboard.js'
 import { EMPTY_DISCOVER, anthropicBaseHint, parseNumber, protoOption } from '../lib/format.js'
 import { errorText, failure } from '../lib/errors.js'
-import { isBuiltin, isOfficial, modelCountText, providerIcon } from '../lib/providers.js'
+import { isBuiltin, isOfficial, modelCountText, providerIcon, providerName } from '../lib/providers.js'
 import { clearDraft, readDraft, writeDraft } from '../lib/draft-store.js'
 import { useBeforeUnload, useProviderDraft } from '../hooks.js'
 import { buildRequestPatch, buildDeepseekPatch } from '../fields.js'
@@ -533,7 +533,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
 
       <section className="dpp-card">
         <header className="dpp-cardHead">
-          <ProviderMark iconKey={providerIcon(data, t)} size={30} />
+          <ProviderMark iconKey={providerIcon(data, t)} label={providerName(data, t)} size={30} />
           <div className="dpp-titleBlock">
             {renaming ? (
               <input

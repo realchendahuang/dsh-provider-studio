@@ -25,7 +25,7 @@ import { PROTO_FALLBACK } from './lib/format.js'
 import { errorText } from './lib/errors.js'
 import { REDUCED_MOTION } from './lib/dom.js'
 import { templateLabel } from './lib/template-text.js'
-import { useLocaleRevision } from './hooks.js'
+import { useColorScheme, useLocaleRevision } from './hooks.js'
 
 /** Keeps a render error inside the panel instead of blanking the settings page. */
 class PanelBoundary extends React.Component {
@@ -78,6 +78,8 @@ function PanelPageInner({ t, call, locale }) {
   const toastSeq = React.useRef(0)
   const timersRef = React.useRef([])
   const rootRef = React.useRef(null)
+  // The icon set needs the active theme; read it off the root's text colour.
+  const colorScheme = useColorScheme(rootRef)
 
   const pushToast = React.useCallback((kind, text, detail) => {
     const id = toastSeq.current + 1
@@ -235,7 +237,7 @@ function PanelPageInner({ t, call, locale }) {
   }
 
   return (
-    <div className="dpp-root" ref={rootRef}>
+    <div className="dpp-root" ref={rootRef} data-dpp-scheme={colorScheme}>
       <div
         key={`${mode}:${selected || ''}`}
         className={`dpp-view${direction === 'out' ? ' is-back' : ''}`}
