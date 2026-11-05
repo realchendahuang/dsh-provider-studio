@@ -1,6 +1,6 @@
 # dsh-provider-studio · 供应商管理
 
-[![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.5-0f1115)](#安装)
+[![DSH](https://img.shields.io/badge/DSH-0.2.x-0f1115)](#安装)
 [![Version](https://img.shields.io/github/package-json/v/realchendahuang/dsh-provider-studio?label=version)](https://github.com/realchendahuang/dsh-provider-studio/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/realchendahuang/dsh-provider-studio)](https://github.com/realchendahuang/dsh-provider-studio/commits/main)
@@ -42,8 +42,8 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 ## 快速开始
 
 ```bash
-# 1. 装到桌面版 profile
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
+# 1. 装到桌面版 profile（带 tag 固定到本次发布）
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.0
 
 # 2. 完全退出 DSH 再重新打开（不是刷新窗口）
 
@@ -54,19 +54,19 @@ dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
 
 ## 安装
 
-前置：DSH 桌面版（本插件按 `0.2.1-rc.5` 与 `0.2.2-rc.1` 实测）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
+前置：DSH 桌面版 0.2.x（`engines.dsh` 锁在 `>=0.2.1-rc.5 <0.3.0-0`，按 `0.2.1-rc.5` 与 `0.2.2-rc.1` 实测；DSH 0.3 发布后需要插件先适配）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
 
 DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`，所以命令里的 `--profile` 要和你实际启动的那个一致。
 
 ### 方式一：直接从 GitHub 安装（推荐）
 
 ```bash
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.0
 ```
 
 - `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
-- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git`。
-- 想固定版本就带 commit：`github:realchendahuang/dsh-provider-studio#<commit-sha>`。
+- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.2.0`。
+- **建议带 tag**：`#v1.2.0` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
 - pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
 
 ### 方式二：克隆到本地（开发 / 改代码）
@@ -96,11 +96,11 @@ dsh plugin --profile desktop why dsh-provider-studio
 
 ### 更新
 
-- **GitHub 安装**：先 remove 再 add（或直接带新 commit 重新 add）：
+- **GitHub 安装**：先 remove 再 add（或直接带新 tag / commit 重新 add）：
 
 ```bash
 dsh plugin --profile desktop remove dsh-provider-studio
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.0
 ```
 
 - **本地 link 安装**：`git pull` 后按需构建：
@@ -237,14 +237,14 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 ### 供应商详情
 
 - 可编辑显示名称（点标题就地改名）、协议、Base URL 和模型表；路由 ID（`route`）创建后不可改。标题右侧 `…` 菜单提供「重命名」和「删除供应商」。
-- 协议三选一：OpenAI 兼容（`/chat/completions`）、OpenAI Responses（`/responses`）、Anthropic Messages（`/messages`）；内置 DeepSeek 行显示为独立的官方协议。
+- 协议三选一：OpenAI 兼容（`/chat/completions`）、OpenAI Responses（`/responses`）、Anthropic Messages（`/v1/messages`）；内置 DeepSeek 行显示为独立的官方协议。
 - 支持 `Cmd/Ctrl+S` 保存；有未保存修改时底部提示、保存按钮才可用，直接返回列表会先确认是否放弃修改。保存结果以右下角提示呈现，写入未真正落盘时会单独报错（见「实现要点」）。
 
 ### API 密钥
 
 - 默认掩码，可**显示 / 隐藏 / 复制 / 更换 / 清除**。更换在同一行内完成（回车保存、Esc 取消），清除前有确认弹窗。
 - 密钥的权威副本始终在 DSH 凭据服务里；本插件自身不把密钥写进 `llm-pi-ai` 配置，也不落盘。
-- 显示 / 复制依赖 DSH 凭据服务能读到真实值；读不到时只显示空值，不会伪造明文。
+- 显示 / 复制通过 Host 的 `revealKey({ route })` 在点击时向 DSH 凭据服务按需读取（供应商详情不再随包返回密钥）；读不到时只显示空值，不会伪造明文。
 - 凭据名（环境变量名）不需要手填：创建时如果填了密钥，按 route 派生（如 `deepseek` → `DEEPSEEK_API_KEY`）；编辑已有供应商不会改写它。
 
 ### 模型
@@ -307,7 +307,8 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 
 - **读取时直接解析 profile patch 文档原文**，而不是 `settings.describe()` 的 schema 投影：投影会丢掉 schema 未声明的字段（每个模型的 `reasoningEfforts` 档位、`compat` 等），保存时就会悄悄丢失。
 - 写入优先走 `settings.replace()`（没有 replace 时退回 update），写完再读回文档**校验是否真的落盘**；界面会显示「保存未落盘」而不是假装成功。
-- 密钥不落本插件：权威副本始终在 DSH 凭据服务，插件只通过 `credentials` 服务读写。
+- 密钥不落本插件：权威副本始终在 DSH 凭据服务，插件只通过 `credentials` 服务读写；明文只在用户点「显示 / 复制」时经 `revealKey` 取回，不随供应商详情返回。
+- 失败统一走 `{ ok: false, code, message, params?, detail? }`：`code` 是稳定机器码（如 `INVALID_BASE_URL`、`SETTINGS_CONFLICT`、`PROBE_HTTP`），客户端按 `err.<CODE>` 本地化，未知码退回 Host 的 `message`；`params` 用于 `{label}` / `{status}` 这类插值。
 - 高级参数走 `saveProvider` 的 `patch.advanced`：Host 端按 pi-ai 的 schema 逐字段校验后再写（思考等级枚举、协议允许的 `compat` 字段、正整数范围），宁可报错也不写坏配置；客户端与 Host 各存一份同一套常量，靠 README 的字段表对齐。
 - Host ↔ Client 走 Typert Remote（`providerPanel` 服务），不注册全局 HTTP 路由。
 - 没有遥测；除用户主动触发的「测试」「拉取模型」会请求所配置的供应商端点外，插件不发起外部网络请求。
@@ -344,7 +345,9 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 - 路由级兜底字段（`defaultContextWindow` / `defaultMaxTokens` / `defaultInput` / `reasoning` / `thinkingBudgets`）和 `modelOverrides` 没有界面，需要时手写 `cordis.patch.yml`；日常配置用模型自己的字段就够。
 - 模板与模型 ID 只是预填建议，不代表账户一定有权限调用。
 - 「复制配置」只导出单个供应商、且不含密钥；整份 profile 的配置仍以 `cordis.patch.yml` 为准。
-- 按 DSH `0.2.1-rc.5` / `0.2.2-rc.1` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配（例如 `0.2.2` 新增的两个图片字段只在 `0.2.2+` 生效）。
+- 密钥显示 / 复制由 Host 的 `revealKey({ route })` 按需读取：只有点击时才去凭据服务取明文，`getProvider` 不再随详情返回密钥；读不到时显示空值，不会伪造明文。
+- Host 失败统一带稳定错误码（`{ ok: false, code, ... }`），界面按 `err.<CODE>` 显示中英文案；排障时优先搜错误码（例如 `PROBE_HTTP`、`SETTINGS_CONFLICT`）。
+- 按 DSH `0.2.1-rc.5` / `0.2.2-rc.1` 实测，`engines.dsh` 限定为 `>=0.2.1-rc.5 <0.3.0-0`；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 0.3 发布后需要先发一版适配（会主动放宽上界，不会被静默放行）。
 
 ## 数据来源与致谢
 
@@ -352,31 +355,39 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 - [lobe-icons](https://github.com/lobehub/lobe-icons)（MIT）：品牌 logo；lobe-icons 未收录的由 `scripts/fetch-favicons.py` 从其官网或文档站抓取 favicon。
 - [Lucide](https://lucide.dev)（ISC）：界面图标（由 `scripts/gen-ui-icons.mjs` 烘焙进 `src/client/ui-icons.jsx`）。
 - [ZCode](https://github.com/zai-org/zcode)（Apache-2.0）：设置页的交互与信息结构参考；本插件未复制其源代码或素材。页面里出现的品牌名称与 logo，商标和版权归各厂商所有。
+- 上述素材的许可全文与商标归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 开发
 
 ```
-index.js            Host 端：settings / credentials 读写、测试与拉取模型
-contract.js         Host ↔ Client 契约：服务名、RPC 描述
-src/client/         浏览器端（JSX 源码）
+index.js            Host 端入口：name / inject / apply 装配
+lib/                Host 端模块：配置读写、凭据、探针、校验与错误码
+contract.js         Host ↔ Client 契约：服务名、方法表、Typert 描述
+src/client/         浏览器端源码（JSX）：views/ 页面、components/ UI 原语、hooks.js、templates/ 模板数据
 client.js           浏览器端构建产物，随仓库提交（安装时直接加载）
 cordis.patch.yml    bundle patch：插入本插件 + 隐藏官方 Models 页
-icons/              品牌 logo 原始文件
+icons/              品牌 logo 源文件（73 SVG + 48px WebP；构建期内联，不随包发布）
 locale/             设置分区标题/描述的本地化
-scripts/            构建与资源生成脚本
+test/               Host 纯函数单测（node:test）
+scripts/            构建、图标生成与发布门禁脚本
 ```
 
 ```bash
-npm install
+npm ci                        # 按 package-lock 安装（首次 / CI；改依赖时用 npm install）
+npm run check                 # 发布门禁：版本、files、patch、图标、client.js 一致性、体积预算
+npm test                      # Host 单测（node:test）
 npm run build:client          # src/client/ → dist/client.bundle.cjs → client.js
-node scripts/gen-icons.mjs    # icons/ → src/client/icons.js
+npm run gen:icons             # icons/ → src/client/icons.js（内联 data URL）
 node scripts/gen-ui-icons.mjs # Lucide 字形 → src/client/ui-icons.jsx
 python3 scripts/fetch-favicons.py  # 为缺 logo 的模板抓官网 favicon（需 Pillow）
 ```
 
-- `client.js` 由 `scripts/build-client.mjs` 用 esbuild 打成 CJS，再包进 `window.__ModuleLoader__.load` 的 factory；React 由 DSH 的模块表提供，不打进 bundle。
+- `client.js` 由 `scripts/build-client.mjs` 用 esbuild 打成 CJS，再包进 `window.__ModuleLoader__.load` 的 factory；React 由 DSH 的模块表提供，不打进 bundle。Node 22 + esbuild 0.25（`package-lock` 锁定）可复现，构建失败不会留下半个 `client.js`（临时文件 + rename）。
+- `scripts/check.mjs` 不写盘：它调用 `build-client.mjs` 暴露的同一套 esbuild 配置在内存里重建 `client.js`，与提交产物逐字节比对；版本、`engines.dsh` 上界、`files` 白名单、`cordis.patch.yml`、模板↔图标孤儿、`node --check`、体积预算也都在这一步。`--no-build` 可跳过重建比对（例如没装 `node_modules`）。CI（`.github/workflows/check.yml`）跑 `npm ci` → `npm run check` → `npm test`。
 - `src/client/icons.js`、`src/client/ui-icons.jsx`、`dist/` 都是生成物，不要手改；`client.js` 是例外——它是需要提交的发布产物。
+- 图标策略：`icons/` 是构建期素材，不是运行时资源。`gen-icons.mjs` 把 SVG 与 48×48 WebP 内联成 `src/client/icons.js` 的 data URL，再被 esbuild 打进 `client.js`；`files` 白名单里没有 `icons/`。PNG 已统一转成 WebP（原 PNG 见 git 历史），新增 favicon 要先转 48px WebP 再跑 `npm run gen:icons`。
 - `scripts/fetch-favicons.py` 读取本机的 `/tmp/providers.json` 与 `/tmp/models-dev.json` 缓存并写入 `icons/`，不是安装或构建的必需步骤。
+- 贡献者用 npm（仓库带 `package-lock.json`）；用户安装时由 DSH 用 pnpm 拉包，两条链路互不影响。
 
 ## 贡献
 
@@ -385,11 +396,12 @@ python3 scripts/fetch-favicons.py  # 为缺 logo 的模板抓官网 favicon（�
 ```bash
 git clone https://github.com/realchendahuang/dsh-provider-studio.git
 cd dsh-provider-studio
-npm install
-npm run build:client   # 改了 src/client/ 之后需要
+npm ci                 # 按 package-lock 安装依赖
+npm run check          # 发布门禁（改 src/client/ 后先 npm run build:client）
+npm test               # Host 单测
 ```
 
-- PR 前请确认 `node scripts/build-client.mjs` 能通过，并把重新生成的 `client.js` 一起提交——插件安装时直接加载它。
+- PR 前跑 `npm run check` 与 `npm test`；改了 `src/client/` 就把重新生成的 `client.js` 一起提交——插件安装时直接加载它。
 - Host 端改动（`index.js` / `contract.js`）必须重启 DSH 才能验证；只改客户端刷新窗口即可。
 - 提交信息用英文祈使句，例如 `Fix key reveal when the secret is empty`。
 - 版本变化记录在 [CHANGELOG.md](CHANGELOG.md)。

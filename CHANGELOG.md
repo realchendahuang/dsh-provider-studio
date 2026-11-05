@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.0 — 2026-11-05
+
+收口的一版：把密钥和凭据的边界收紧，失败有稳定的错误码，界面补齐 i18n 与可访问性，Host/Client 拆成可维护的模块，图标换成 WebP 瘦身，并第一次有了发布门禁。
+
+- **草稿探测不再借用已存密钥**：`testModel` / `discoverModels` 删掉 `apiKeyEnv` 参数，只给 Base URL 的草稿只能使用调用方粘贴的 `apiKey`，Host 不再为草稿解析任何已存凭据
+- **密钥按需读取**：新增 `revealKey({ route })`，只有用户点「显示 / 复制」时才向凭据服务取明文；`getProvider` 不再随供应商详情返回 `secret`，读取路径与展示路径分开，旧客户端仍可回落
+- **写路径加固**：`route` 拒绝 `__proto__` / `prototype` / `constructor`，内部字典改 `Object.create(null)` + `Object.hasOwn`；`saveProvider` / `createProvider` 共用同一套 api / baseURL / models 校验；写入带 `revision`，并发冲突返回 `SETTINGS_CONFLICT` 而不是静默覆盖
+- **修好三个静默缺陷**：导出的内置 DeepSeek 包名改为真实的 `@deepseek-ai/dsh-llm-deepseek-api-key`（原来贴回 patch 静默无效）；内置 DeepSeek 的测试走 `anthropic-messages` + `{base}/v1/messages` + `x-api-key`，拉取走官方 `https://api.deepseek.com/models`；日志改用 `ctx.logger.warn`（`ctx.get('logger')` 永远拿不到服务，之前的 warn 被丢弃）
+- **失败统一错误码**：所有失败返回 `{ ok: false, code, message, params?, detail? }`，码表 28 个（`INVALID_BASE_URL`、`SETTINGS_CONFLICT`、`PROBE_HTTP`…），客户端另有 `REMOTE_UNAVAILABLE`；客户端按 `err.<CODE>` 渲染中英文案，未知码退回 Host 文案，`params` 支持 `{label}` / `{status}` 插值
+- **中英文自动切换**：订阅 locale 快照，语言切换后组件实时重渲染；补齐组件、模板中文名与协议名等硬编码串，英文界面不再夹中文
+- **可访问性**：模型弹窗加 Tab focus trap、打开聚焦、关闭还焦，`ActionMenu` / `SelectMenu` 补 `aria-activedescendant` 与焦点进入，API Key 输入框补可访问名字，小字对比度提到 ≥4.5:1
+- **未保存修改拦截扩到关闭窗口**：除返回列表外，关闭窗口 / 卸载设置分区也会拦；保存成功后的读回失败不再误报「保存失败」；确认框动作抛错会提示而不是吞掉
+- **图标瘦身**：79 个 PNG logo 转 48×48 WebP（显示尺寸 24px 的 2x），`src/client/icons.js` 从 350 KB 降到约 230 KB，`client.js` 从 618 KB 降到约 500 KB，152 个 logo 全部保留；新增 600 KB 的体积预算，超了门禁就失败
+- **Host 拆分**：`index.js` 从 1254 行收到 48 行，只留 `name` / `inject` / `apply` 装配；按职责拆成 `lib/` 12 个模块（settings、credentials、probe、validate、errors、models、routes、views、service、profile、vocabulary、util），并对纯函数补了 `node:test` 单测
+- **Client 拆分**：`app.jsx`（2939 行）拆成 views / components / hooks / lib，`templates.js` 拆成 `templates/`，每个文件回到可读规模；删除死字段与重复项，清洗模板里的占位 URL
+- **构建脚本加固**：`scripts/build-client.mjs` 改原子写（临时文件 + rename，失败不留半个产物）、打印 esbuild 版本、失败给可执行提示，并暴露内存构建入口供门禁复用
+- **发布门禁**：新增 `scripts/check.mjs`（零新依赖）——版本三处一致、`engines.dsh` 有上界、`files` 白名单与 exports 覆盖、`cordis.patch.yml` 可解析、模板↔图标孤儿、内存重建 `client.js` 逐字节比对、`node --check`、体积预算；失败退出码 1
+- **发布元数据**：`version` 1.2.0，`engines.dsh` 收紧为 `>=0.2.1-rc.5 <0.3.0-0`，`files` 补 `lib/` 与 `THIRD_PARTY_NOTICES.md`，`scripts` 增加 `check` / `test` / `gen:icons`
+- **许可与仓库卫生**：新增 `THIRD_PARTY_NOTICES.md`（lobe-icons MIT、Lucide ISC、models.dev MIT + 商标归属）与 `.gitattributes`（`client.js` 标为生成物、跳过 diff；`.webp` 标 binary；统一 LF）
+- **CI**：新增 `.github/workflows/check.yml`（node 22 + `npm ci` + `npm run check` + `node --test test/`）
+- **文档**：README 修掉 Anthropic 协议路径漏改的 `/messages`（正确是 `/v1/messages`），安装命令建议带 `#v1.2.0` tag，补开发/门禁/图标策略说明与新的已知限制
+
 ## 1.1.2 — 2026-11-05
 
 把两个会说谎的探针修好，新建流程去掉「自己查 model id」，配置可以带走了。
