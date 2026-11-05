@@ -15,11 +15,11 @@
  * `firstModel` stays empty: model ids differ per account and per catalog.
  */
 
-const COMMON = '常用'
-const CN = '国内厂商'
-const GLOBAL = '海外厂商'
-const GATEWAY = '网关 / 聚合'
-const MORE = '更多供应商'
+const COMMON = 'groupCommon'
+const CN = 'groupCn'
+const GLOBAL = 'groupGlobal'
+const GATEWAY = 'groupGateway'
+const MORE = 'groupMore'
 
 export const PROVIDER_TEMPLATES = [
   {
@@ -63,7 +63,7 @@ export const PROVIDER_TEMPLATES = [
     group: COMMON,
     displayName: 'MiniMax',
     api: 'anthropic-messages',
-    baseURL: 'https://api.minimax.io/anthropic/v1',
+    baseURL: 'https://api.minimax.io/anthropic',
     credentialRef: 'MINIMAX_API_KEY',
     firstModel: '',
     note: '中国站用 api.minimaxi.com/anthropic',
@@ -97,7 +97,7 @@ export const PROVIDER_TEMPLATES = [
     group: COMMON,
     displayName: 'Anthropic',
     api: 'anthropic-messages',
-    baseURL: 'https://api.anthropic.com/v1',
+    baseURL: 'https://api.anthropic.com',
     credentialRef: 'ANTHROPIC_API_KEY',
     firstModel: '',
   },
@@ -1080,7 +1080,7 @@ export const PROVIDER_TEMPLATES = [
     group: MORE,
     displayName: 'FreeModel',
     api: 'anthropic-messages',
-    baseURL: 'https://cc.freemodel.dev/v1',
+    baseURL: 'https://cc.freemodel.dev',
     credentialRef: 'FREEMODEL_API_KEY',
     firstModel: '',
   },
@@ -1509,7 +1509,7 @@ export const PROVIDER_TEMPLATES = [
     group: MORE,
     displayName: 'MiniMax (minimax.cn)',
     api: 'anthropic-messages',
-    baseURL: 'https://api.minimax.cn/anthropic/v1',
+    baseURL: 'https://api.minimax.cn/anthropic',
     credentialRef: 'MINIMAX_API_KEY',
     firstModel: '',
   },
@@ -1520,7 +1520,7 @@ export const PROVIDER_TEMPLATES = [
     group: MORE,
     displayName: 'MiniMax Token Plan (minimax.cn)',
     api: 'anthropic-messages',
-    baseURL: 'https://api.minimax.cn/anthropic/v1',
+    baseURL: 'https://api.minimax.cn/anthropic',
     credentialRef: 'MINIMAX_API_KEY',
     firstModel: '',
   },
@@ -1531,7 +1531,7 @@ export const PROVIDER_TEMPLATES = [
     group: MORE,
     displayName: 'MiniMax Token Plan (minimax.io)',
     api: 'anthropic-messages',
-    baseURL: 'https://api.minimax.io/anthropic/v1',
+    baseURL: 'https://api.minimax.io/anthropic',
     credentialRef: 'MINIMAX_API_KEY',
     firstModel: '',
   },
@@ -2056,7 +2056,7 @@ export const PROVIDER_TEMPLATES = [
     group: MORE,
     displayName: 'Subconscious',
     api: 'anthropic-messages',
-    baseURL: 'https://api.subconscious.dev/v1',
+    baseURL: 'https://api.subconscious.dev',
     credentialRef: 'SUBCONSCIOUS_API_KEY',
     firstModel: '',
   },
@@ -2154,7 +2154,7 @@ export const PROVIDER_TEMPLATES = [
     group: MORE,
     displayName: 'Thinking Machines',
     api: 'anthropic-messages',
-    baseURL: 'https://tinker.thinkingmachines.dev/services/tinker-prod/anthropic/api/v1',
+    baseURL: 'https://tinker.thinkingmachines.dev/services/tinker-prod/anthropic/api',
     credentialRef: 'TINKER_API_KEY',
     firstModel: '',
   },

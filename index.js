@@ -19,7 +19,7 @@
 
 import { readFile } from 'node:fs/promises'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { parse as parseYaml } from 'yaml'
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
 import { PACKAGE, SERVICE_KEY, TYPERT_MANIFEST } from './contract.js'
 
@@ -170,6 +170,58 @@ function makeHostPlain(value) {
     return out
   }
   return value
+}
+
+// ---------------------------------------------------------------------------
+// wire shape of a probe request
+//
+// The panel's 「测试」 and 「拉取模型」 have to hit the same URL with the same
+// headers the adapter itself would, otherwise a provider that works in DSH is
+// reported as broken. Both rules below are copied from `dsh-llm-pi-ai`:
+//  - messages: the configured `baseURL` is passed to the SDK unchanged and the
+//    SDK appends its path, so Anthropic lands on `{baseURL}/v1/messages`;
+//  - listing: pi-ai normalizes one trailing `/v1` for Anthropic only, because
+//    gateway docs publish both spellings of the same root.
+// ---------------------------------------------------------------------------
+
+const MESSAGE_PATHS = {
+  'openai-completions': '/chat/completions',
+  'openai-responses': '/responses',
+  'anthropic-messages': '/v1/messages',
+}
+
+const trimmedBase = (value) => text(value).trim().replace(/\/+$/, '')
+
+function messagesUrl(baseURL, api) {
+  const path = MESSAGE_PATHS[api] || MESSAGE_PATHS['openai-completions']
+  return `${trimmedBase(baseURL)}${path}`
+}
+
+function listingUrl(baseURL, api) {
+  const base = trimmedBase(baseURL)
+  if (api !== 'anthropic-messages') return `${base}/models`
+  return `${base.endsWith('/v1') ? base.slice(0, -3) : base}/v1/models?limit=1000`
+}
+
+/** Auth headers each protocol's SDK would set on its own. */
+function authHeaders(api, key) {
+  if (api === 'anthropic-messages') {
+    return { 'content-type': 'application/json', accept: 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }
+  }
+  return { 'content-type': 'application/json', accept: 'application/json', authorization: `Bearer ${key}` }
+}
+
+/** Deployment headers from the profile, applied last so they win over defaults
+ *  exactly the way the adapter's `requestHeaders` merge does. */
+function probeHeaders(profileHeaders, api, key) {
+  const headers = authHeaders(api, key)
+  if (profileHeaders === null || typeof profileHeaders !== 'object') return headers
+  for (const [name, value] of Object.entries(profileHeaders)) {
+    const header = name.trim()
+    if (header === '' || typeof value !== 'string') continue
+    headers[header] = value
+  }
+  return headers
 }
 
 // ---------------------------------------------------------------------------
@@ -722,26 +774,6 @@ class ProviderPanelRuntime extends TypertRemoteService {
   async listProviders() {
     const settings = this.settings()
     const providers = await readProvidersExact(this.ctx, settings)
-    let debug
-    try {
-      if (settings !== undefined && settings !== null && typeof settings.describe === 'function') {
-        const rows = settings.describe({ redactSecrets: false }) || []
-        debug = {
-          arm: typeof settings.get === 'function' ? 'raw' : 'descriptor',
-          hasReplace: typeof settings.replace === 'function',
-          hasUpdate: typeof settings.update === 'function',
-          rows: rows.map((row) => ({
-            ns: row === null || row === undefined ? null : (row.ns ?? row.id ?? null),
-            user: Object.keys((row && row.user && row.user.providers) || {}),
-            value: Object.keys((row && row.value && row.value.providers) || {}),
-          })),
-        }
-      } else {
-        debug = { arm: typeof (settings && settings.get) === 'function' ? 'raw' : 'unknown', hasReplace: false, hasUpdate: false, rows: [] }
-      }
-    } catch (error) {
-      debug = { error: String(error && error.message ? error.message : error) }
-    }
     const items = []
     for (const [route, profile] of Object.entries(providers)) {
       const ref = text(profile.apiKeyEnv)
@@ -788,7 +820,7 @@ class ProviderPanelRuntime extends TypertRemoteService {
     items.sort((a, b) => (a.displayName || a.route).localeCompare(b.displayName || b.route))
     const writable = settings !== undefined && settings !== null
       && (typeof settings.replace === 'function' || typeof settings.update === 'function')
-    return { ok: true, providers: items, protocols: [...PROTOCOLS], writable, debug }
+    return { ok: true, providers: items, protocols: [...PROTOCOLS], writable }
   }
 
   async getProvider(args) {
@@ -995,7 +1027,6 @@ class ProviderPanelRuntime extends TypertRemoteService {
         return { ok: false, error: `供应商已创建，但密钥写入失败：${String(err && err.message ? err.message : err)}` }
       }
     }
-    warn(this.ctx, `createProvider(${route}) wrote; routes now: ${Object.keys(readProviders(settings)).join(',')}`)
     return { ok: true, route }
   }
 
@@ -1015,47 +1046,116 @@ class ProviderPanelRuntime extends TypertRemoteService {
     return { ok: true, route }
   }
 
-  /** One minimal request against the provider endpoint to prove a model works. */
-  async testModel(args) {
+  /** Copy one provider out as a paste-ready `cordis.patch.yml` entry.
+   *
+   * Reads the patch document (not the schema projection) so hand-written
+   * fields survive the round trip, and never emits a secret: keys live under
+   * `apiKeyEnv` as a credential *name*, which is all a second machine needs.
+   */
+  async exportProvider(args) {
     const route = text(args && args.route)
-    const modelId = text(args && args.model)
     if (!route) return { ok: false, error: '缺少 route' }
-    if (!modelId) return { ok: false, error: '缺少模型 ID' }
     const settings = this.settings()
-    let baseURL
-    let api
-    let ref
+
+    let entry
     if (route === DEEPSEEK_NS) {
       const config = await readDeepseekConfig(this.ctx, settings)
-      baseURL = (text(config.baseURL) || DEEPSEEK_DEFAULT_BASE).replace(/\/+$/, '')
-      api = 'openai-completions'
-      ref = text(config.apiKeyEnv) || DEEPSEEK_DEFAULT_REF
+      if (Object.keys(config).length === 0) {
+        return { ok: false, error: '这个供应商还没有任何自定义配置，没有可导出的内容' }
+      }
+      entry = { id: DEEPSEEK_NS, name: '@deepseek-ai/dsh-llm-deepseek', config }
     } else {
+      const document = await readConfigFromDocument(this.ctx, settings, LLM_NS)
+      const fromDocument = document !== null && document !== undefined && typeof document.providers === 'object'
+        ? document.providers
+        : undefined
+      const providers = await readProvidersExact(this.ctx, settings)
+      const profile = (fromDocument && fromDocument[route] !== null && typeof fromDocument[route] === 'object')
+        ? fromDocument[route]
+        : providers[route]
+      if (profile === null || profile === undefined || typeof profile !== 'object') {
+        return { ok: false, error: `供应商 "${route}" 不存在` }
+      }
+      const providersBlock = Object.create(null)
+      providersBlock[route] = profile
+      entry = { id: LLM_NS, name: '@deepseek-ai/dsh-llm-pi-ai', config: { providers: providersBlock } }
+    }
+
+    let yaml
+    try {
+      yaml = stringifyYaml([entry], { lineWidth: 0 })
+    } catch (err) {
+      return { ok: false, error: `生成 YAML 失败：${String(err && err.message ? err.message : err)}` }
+    }
+    const header = '# Exported by dsh-provider-studio — API keys are not included.\n'
+    return { ok: true, route, yaml: header + yaml }
+  }
+
+  /** Where a probe goes and how it authenticates.
+   *
+   * Accepts a saved route *or* a draft the client has not saved yet: the create
+   * dialog reads the endpoint's model list before the provider exists.
+   */
+  async probeTarget(args) {
+    const route = text(args && args.route)
+    const settings = this.settings()
+    if (route === DEEPSEEK_NS) {
+      const config = await readDeepseekConfig(this.ctx, settings)
+      const ref = text(config.apiKeyEnv) || DEEPSEEK_DEFAULT_REF
+      const key = await resolveSecret(this.ctx, ref)
+      if (!key) return { ok: false, error: `没有可用的密钥（${ref}）` }
+      return {
+        ok: true,
+        baseURL: text(config.baseURL) || DEEPSEEK_DEFAULT_BASE,
+        api: 'openai-completions',
+        key,
+        headers: {},
+      }
+    }
+    if (route) {
       const providers = await readProvidersExact(this.ctx, settings)
       const profile = providers[route]
       if (profile === undefined) return { ok: false, error: `供应商 "${route}" 不存在` }
-      baseURL = text(profile.baseURL).replace(/\/+$/, '')
-      if (!baseURL) return { ok: false, error: '这个供应商没有 baseURL，无法测试' }
-      api = text(profile.api) || 'openai-completions'
-      ref = text(profile.apiKeyEnv)
+      const baseURL = trimmedBase(profile.baseURL)
+      if (!baseURL) return { ok: false, error: '这个供应商没有 baseURL，无法访问端点' }
+      const ref = text(profile.apiKeyEnv)
+      const key = await resolveSecret(this.ctx, ref)
+      if (!key) return { ok: false, error: `没有可用的密钥（${ref || '未配置凭据名'}）` }
+      return {
+        ok: true,
+        baseURL,
+        api: text(profile.api) || 'openai-completions',
+        key,
+        headers: profile.headers,
+      }
     }
-    const key = await resolveSecret(this.ctx, ref)
-    if (!key) return { ok: false, error: `没有可用的密钥（${ref || '未配置凭据名'}）` }
+    // Draft: a baseURL and a key, but no route in the configuration yet.
+    const baseURL = trimmedBase(args && args.baseURL)
+    if (!baseURL) return { ok: false, error: '缺少 route 或 baseURL' }
+    const api = text(args && args.api) || 'openai-completions'
+    if (!PROTOCOLS.includes(api)) return { ok: false, error: `不支持的协议：${api}` }
+    const pasted = typeof (args && args.apiKey) === 'string' ? args.apiKey.trim() : ''
+    const key = pasted || (await resolveSecret(this.ctx, text(args && args.apiKeyEnv)))
+    if (!key) return { ok: false, error: '先填写 API Key 才能读取端点的模型列表' }
+    return { ok: true, baseURL, api, key, headers: null }
+  }
 
-    let endpoint
-    let headers
+  /** One minimal request against the provider endpoint to prove a model works. */
+  async testModel(args) {
+    const modelId = text(args && args.model)
+    if (!modelId) return { ok: false, error: '缺少模型 ID' }
+    const target = await this.probeTarget(args)
+    if (!target.ok) return target
+
+    const { api, key } = target
+    const endpoint = messagesUrl(target.baseURL, api)
+    const headers = probeHeaders(target.headers, api, key)
     let body
     if (api === 'anthropic-messages') {
-      endpoint = `${baseURL}/messages`
-      headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }
       body = { model: modelId, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }
     } else if (api === 'openai-responses') {
-      endpoint = `${baseURL}/responses`
-      headers = { 'content-type': 'application/json', authorization: `Bearer ${key}` }
       body = { model: modelId, input: 'ping', max_output_tokens: 16 }
     } else {
-      endpoint = `${baseURL}/chat/completions`
-      headers = { 'content-type': 'application/json', authorization: `Bearer ${key}` }
       body = { model: modelId, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1, stream: false }
     }
 
@@ -1092,34 +1192,13 @@ class ProviderPanelRuntime extends TypertRemoteService {
     return { ok: true, endpoint, status: response.status, latency, model: modelId }
   }
 
+  /** List the models an endpoint reports, for a saved route or a draft. */
   async discoverModels(args) {
-    const route = text(args && args.route)
-    if (!route) return { ok: false, error: '缺少 route' }
-    const settings = this.settings()
-    let baseURL
-    let api
-    let ref
-    if (route === DEEPSEEK_NS) {
-      const config = await readDeepseekConfig(this.ctx, settings)
-      baseURL = (text(config.baseURL) || DEEPSEEK_DEFAULT_BASE).replace(/\/+$/, '')
-      api = 'openai-completions'
-      ref = text(config.apiKeyEnv) || DEEPSEEK_DEFAULT_REF
-    } else {
-      const providers = await readProvidersExact(this.ctx, settings)
-      const profile = providers[route]
-      if (profile === undefined) return { ok: false, error: `供应商 "${route}" 不存在` }
-      baseURL = text(profile.baseURL).replace(/\/+$/, '')
-      if (!baseURL) return { ok: false, error: '这个供应商没有 baseURL，无法向端点查询模型' }
-      api = text(profile.api)
-      ref = text(profile.apiKeyEnv)
-    }
-    const key = await resolveSecret(this.ctx, ref)
-    if (!key) return { ok: false, error: `没有可用的密钥（${ref || '未配置凭据名'}），无法查询端点` }
+    const target = await this.probeTarget(args)
+    if (!target.ok) return target
 
-    const endpoint = `${baseURL}/models`
-    const headers = api === 'anthropic-messages'
-      ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
-      : { authorization: `Bearer ${key}` }
+    const endpoint = listingUrl(target.baseURL, target.api)
+    const headers = probeHeaders(target.headers, target.api, target.key)
 
     let response
     try {

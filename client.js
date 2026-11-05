@@ -52,7 +52,8 @@ window.__ModuleLoader__.load({
       "createProvider",
       "deleteProvider",
       "discoverModels",
-      "testModel"
+      "testModel",
+      "exportProvider"
     ];
     var parser = (parse) => ({ parse });
     var strictCodec = (typeSymbol, parse) => ({
@@ -116,11 +117,11 @@ window.__ModuleLoader__.load({
     var import_react2 = __toESM(require("react"), 1);
 
     // src/client/templates.js
-    var COMMON = "\u5E38\u7528";
-    var CN = "\u56FD\u5185\u5382\u5546";
-    var GLOBAL = "\u6D77\u5916\u5382\u5546";
-    var GATEWAY = "\u7F51\u5173 / \u805A\u5408";
-    var MORE = "\u66F4\u591A\u4F9B\u5E94\u5546";
+    var COMMON = "groupCommon";
+    var CN = "groupCn";
+    var GLOBAL = "groupGlobal";
+    var GATEWAY = "groupGateway";
+    var MORE = "groupMore";
     var PROVIDER_TEMPLATES = [
       {
         id: "deepseek",
@@ -163,7 +164,7 @@ window.__ModuleLoader__.load({
         group: COMMON,
         displayName: "MiniMax",
         api: "anthropic-messages",
-        baseURL: "https://api.minimax.io/anthropic/v1",
+        baseURL: "https://api.minimax.io/anthropic",
         credentialRef: "MINIMAX_API_KEY",
         firstModel: "",
         note: "\u4E2D\u56FD\u7AD9\u7528 api.minimaxi.com/anthropic"
@@ -197,7 +198,7 @@ window.__ModuleLoader__.load({
         group: COMMON,
         displayName: "Anthropic",
         api: "anthropic-messages",
-        baseURL: "https://api.anthropic.com/v1",
+        baseURL: "https://api.anthropic.com",
         credentialRef: "ANTHROPIC_API_KEY",
         firstModel: ""
       },
@@ -1180,7 +1181,7 @@ window.__ModuleLoader__.load({
         group: MORE,
         displayName: "FreeModel",
         api: "anthropic-messages",
-        baseURL: "https://cc.freemodel.dev/v1",
+        baseURL: "https://cc.freemodel.dev",
         credentialRef: "FREEMODEL_API_KEY",
         firstModel: ""
       },
@@ -1609,7 +1610,7 @@ window.__ModuleLoader__.load({
         group: MORE,
         displayName: "MiniMax (minimax.cn)",
         api: "anthropic-messages",
-        baseURL: "https://api.minimax.cn/anthropic/v1",
+        baseURL: "https://api.minimax.cn/anthropic",
         credentialRef: "MINIMAX_API_KEY",
         firstModel: ""
       },
@@ -1620,7 +1621,7 @@ window.__ModuleLoader__.load({
         group: MORE,
         displayName: "MiniMax Token Plan (minimax.cn)",
         api: "anthropic-messages",
-        baseURL: "https://api.minimax.cn/anthropic/v1",
+        baseURL: "https://api.minimax.cn/anthropic",
         credentialRef: "MINIMAX_API_KEY",
         firstModel: ""
       },
@@ -1631,7 +1632,7 @@ window.__ModuleLoader__.load({
         group: MORE,
         displayName: "MiniMax Token Plan (minimax.io)",
         api: "anthropic-messages",
-        baseURL: "https://api.minimax.io/anthropic/v1",
+        baseURL: "https://api.minimax.io/anthropic",
         credentialRef: "MINIMAX_API_KEY",
         firstModel: ""
       },
@@ -2156,7 +2157,7 @@ window.__ModuleLoader__.load({
         group: MORE,
         displayName: "Subconscious",
         api: "anthropic-messages",
-        baseURL: "https://api.subconscious.dev/v1",
+        baseURL: "https://api.subconscious.dev",
         credentialRef: "SUBCONSCIOUS_API_KEY",
         firstModel: ""
       },
@@ -2254,7 +2255,7 @@ window.__ModuleLoader__.load({
         group: MORE,
         displayName: "Thinking Machines",
         api: "anthropic-messages",
-        baseURL: "https://tinker.thinkingmachines.dev/services/tinker-prod/anthropic/api/v1",
+        baseURL: "https://tinker.thinkingmachines.dev/services/tinker-prod/anthropic/api",
         credentialRef: "TINKER_API_KEY",
         firstModel: ""
       },
@@ -3139,6 +3140,10 @@ window.__ModuleLoader__.load({
       const hint = PROTO_ENDPOINT[api];
       const label = protoLabel(api, t);
       return hint ? `${label} (${hint})` : label;
+    }
+    function anthropicBaseHint(api, baseURL, t) {
+      if (api !== "anthropic-messages") return void 0;
+      return /\/v1\/?$/i.test(String(baseURL || "").trim()) ? t("anthropicBaseHint") : void 0;
     }
     function modelCountText(item, t) {
       if (item.usesCatalog === true || !(item.modelCount > 0)) return t("usesCatalog");
@@ -4515,6 +4520,19 @@ window.__ModuleLoader__.load({
           pushToast("err", t("saveFailed"), errText(err));
         }
       };
+      const copyConfig = async () => {
+        try {
+          const result = await call("exportProvider", { route });
+          if (!result || result.ok !== true || typeof result.yaml !== "string") {
+            pushToast("err", t("saveFailed"), result && result.error ? result.error : "");
+            return;
+          }
+          await copyText(result.yaml);
+          pushToast("ok", t("copiedConfig"));
+        } catch (err) {
+          pushToast("err", t("saveFailed"), errText(err));
+        }
+      };
       const testModel = async (model) => {
         if (busy || readOnly || !model.id) return;
         setTesting(model.id);
@@ -4598,7 +4616,15 @@ window.__ModuleLoader__.load({
           }
         });
       };
+      const baseURLHint = anthropicBaseHint(draft.api, draft.baseURL, t);
       const menuItems = [];
+      menuItems.push({
+        icon: "copy",
+        label: t("copyConfig"),
+        onSelect: () => {
+          void copyConfig();
+        }
+      });
       if (!builtin) {
         menuItems.push({
           icon: "pencil",
@@ -4658,7 +4684,7 @@ window.__ModuleLoader__.load({
           placeholder: "https://api.example.com/v1",
           onChange: (event) => setDraft({ ...draft, baseURL: event.target.value })
         }
-      )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("protocol") }, official ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-readonly" }, t("officialProtocol")) : /* @__PURE__ */ import_react2.default.createElement(
+      ), baseURLHint !== void 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldHint" }, baseURLHint) : null), /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("protocol") }, official ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-readonly" }, t("officialProtocol")) : /* @__PURE__ */ import_react2.default.createElement(
         SelectMenu,
         {
           value: draft.api,
@@ -4843,7 +4869,7 @@ window.__ModuleLoader__.load({
             const haystack = `${template.label} ${template.displayName} ${template.baseURL} ${template.id}`;
             if (!haystack.toLowerCase().includes(needle)) continue;
           }
-          const name2 = template.group || t("groupOther");
+          const name2 = template.group ? t(template.group) : t("groupOther");
           if (!byGroup.has(name2)) {
             byGroup.set(name2, []);
             order.push(name2);
@@ -4897,17 +4923,47 @@ window.__ModuleLoader__.load({
       apiKey: "",
       modelId: ""
     };
-    function CreateForm({ protocols, t, onCancel, onSubmit, busy, initial }) {
+    var MANUAL_MODEL = "__manual__";
+    function CreateForm({ protocols, t, call, onCancel, onSubmit, busy, initial }) {
       const [form, setForm] = import_react2.default.useState(() => ({
         ...EMPTY_CREATE,
         ...initial !== null && typeof initial === "object" ? initial : {}
       }));
       const [error, setError] = import_react2.default.useState("");
+      const [endpointModels, setEndpointModels] = import_react2.default.useState([]);
+      const [reading, setReading] = import_react2.default.useState(false);
       const preset = initial !== null && typeof initial === "object" ? initial : null;
       const heading = preset !== null && preset.displayName ? preset.displayName : t("newProvider");
       const set = (patch) => {
         setForm((current) => ({ ...current, ...patch }));
         setError("");
+        if ("baseURL" in patch || "api" in patch || "apiKey" in patch) setEndpointModels([]);
+      };
+      const readEndpoint = async () => {
+        setError("");
+        const baseURL = form.baseURL.trim();
+        if (!baseURL) {
+          setError(t("needBaseURL"));
+          return;
+        }
+        setReading(true);
+        try {
+          const result = await call("discoverModels", { baseURL, api: form.api, apiKey: form.apiKey });
+          if (!result || result.ok !== true) {
+            setError(result && result.error ? result.error : t("discoverFailed"));
+            return;
+          }
+          const list = Array.isArray(result.models) ? result.models : [];
+          if (list.length === 0) {
+            setError(t("discoverEmpty"));
+            return;
+          }
+          setEndpointModels(list);
+        } catch (err) {
+          setError(errText(err));
+        } finally {
+          setReading(false);
+        }
       };
       const submit = async () => {
         setError("");
@@ -4943,6 +4999,7 @@ window.__ModuleLoader__.load({
         }
       };
       const iconKey = preset !== null && preset.icon ? preset.icon : null;
+      const baseURLHint = anthropicBaseHint(form.api, form.baseURL, t);
       return /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement("header", { className: "dpp-subHead" }, /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-backBtn", onClick: onCancel }, /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "arrow-left", size: 16 }), /* @__PURE__ */ import_react2.default.createElement("span", null, t("browseTemplates"))), /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-subHeadTitle" }, /* @__PURE__ */ import_react2.default.createElement(ProviderMark, { iconKey, size: 24 }), /* @__PURE__ */ import_react2.default.createElement("h2", { className: "dpp-pageTitle" }, heading))), /* @__PURE__ */ import_react2.default.createElement("section", { className: "dpp-card" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-cardBody" }, /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-formGrid" }, /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("displayName") }, /* @__PURE__ */ import_react2.default.createElement(
         "input",
         {
@@ -4976,7 +5033,7 @@ window.__ModuleLoader__.load({
           placeholder: "https://api.example.com/v1",
           onChange: (event) => set({ baseURL: event.target.value })
         }
-      )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("apiKey"), wide: true }, /* @__PURE__ */ import_react2.default.createElement(
+      ), baseURLHint !== void 0 ? /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-fieldHint" }, baseURLHint) : null), /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("apiKey"), wide: true }, /* @__PURE__ */ import_react2.default.createElement(
         "input",
         {
           className: "dpp-input dpp-inputMono",
@@ -4986,18 +5043,54 @@ window.__ModuleLoader__.load({
           placeholder: "sk-...",
           onChange: (event) => set({ apiKey: event.target.value })
         }
-      )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: t("firstModel"), wide: true }, /* @__PURE__ */ import_react2.default.createElement(
-        "input",
+      )), /* @__PURE__ */ import_react2.default.createElement(
+        Field,
         {
-          className: "dpp-input dpp-inputMono",
-          value: form.modelId,
-          placeholder: "deepseek-v4.1-flash",
-          onChange: (event) => set({ modelId: event.target.value }),
-          onKeyDown: (event) => {
-            if (event.key === "Enter") void submit();
+          label: t("firstModel"),
+          wide: true,
+          hint: endpointModels.length > 0 ? `${endpointModels.length} ${t("modelCount")}` : void 0
+        },
+        endpointModels.length === 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { className: "dpp-inlineField" }, /* @__PURE__ */ import_react2.default.createElement(
+          "input",
+          {
+            className: "dpp-input dpp-inputMono",
+            value: form.modelId,
+            placeholder: "deepseek-v4.1-flash",
+            onChange: (event) => set({ modelId: event.target.value }),
+            onKeyDown: (event) => {
+              if (event.key === "Enter") void submit();
+            }
           }
-        }
-      ))), error !== "" ? /* @__PURE__ */ import_react2.default.createElement(Alert, { kind: "err", text: error }) : null), /* @__PURE__ */ import_react2.default.createElement("footer", { className: "dpp-cardFoot" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-dirty" }), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: onCancel, disabled: busy }, t("cancel")), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnPrimary", onClick: () => {
+        ), /* @__PURE__ */ import_react2.default.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dpp-btn dpp-btnGhost dpp-btnSm",
+            title: t("readModels"),
+            disabled: reading || busy,
+            onClick: () => {
+              void readEndpoint();
+            }
+          },
+          reading ? /* @__PURE__ */ import_react2.default.createElement(Spinner, { size: 13 }) : /* @__PURE__ */ import_react2.default.createElement(Icon, { name: "refresh-cw", size: 13 }),
+          /* @__PURE__ */ import_react2.default.createElement("span", null, t("readModels"))
+        )) : /* @__PURE__ */ import_react2.default.createElement(
+          SelectMenu,
+          {
+            value: form.modelId,
+            ariaLabel: t("firstModel"),
+            placeholder: t("pickFirstModel"),
+            options: endpointModels.map((model) => ({ value: model.id, label: model.id })).concat([{ value: MANUAL_MODEL, label: t("manualInput") }]),
+            onChange: (next) => {
+              if (next === MANUAL_MODEL) {
+                setEndpointModels([]);
+                return;
+              }
+              set({ modelId: next });
+            }
+          }
+        )
+      )), error !== "" ? /* @__PURE__ */ import_react2.default.createElement(Alert, { kind: "err", text: error }) : null), /* @__PURE__ */ import_react2.default.createElement("footer", { className: "dpp-cardFoot" }, /* @__PURE__ */ import_react2.default.createElement("span", { className: "dpp-dirty" }), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnGhost", onClick: onCancel, disabled: busy }, t("cancel")), /* @__PURE__ */ import_react2.default.createElement("button", { type: "button", className: "dpp-btn dpp-btnPrimary", onClick: () => {
         void submit();
       }, disabled: busy }, busy ? /* @__PURE__ */ import_react2.default.createElement(Spinner, null) : null, busy ? t("saving") : t("createSubmit")))));
     }
@@ -5161,6 +5254,7 @@ window.__ModuleLoader__.load({
           {
             protocols,
             t,
+            call,
             busy,
             initial: preset,
             onCancel: () => {
@@ -5334,6 +5428,10 @@ window.__ModuleLoader__.load({
     .dpp-fieldHeadActions{display:flex;align-items:center;gap:6px}
     .dpp-count{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:5px;background:var(--dpp-fill);color:var(--dpp-fg3);font-size:10.5px;font-weight:500;font-family:inherit;letter-spacing:0}
     .dpp-formGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 14px}
+    /* An input with a trailing action button, sized to the input's own height. */
+    .dpp-inlineField{display:flex;align-items:center;gap:8px;min-width:0}
+    .dpp-inlineField>.dpp-input{flex:1 1 auto;min-width:0;width:auto}
+    .dpp-inlineField>.dpp-btn{flex:0 0 auto;height:32px}
 
     /* --------------------------------------------------------------- selectors */
     .dpp-selectMenu{position:relative}
@@ -5606,6 +5704,11 @@ window.__ModuleLoader__.load({
       customProvider: "\u81EA\u5B9A\u4E49\u4F9B\u5E94\u5546",
       customProviderHint: "\u624B\u52A8\u586B\u5199 Base URL \u4E0E\u534F\u8BAE",
       groupOther: "\u5176\u4ED6",
+      groupCommon: "\u5E38\u7528",
+      groupCn: "\u56FD\u5185\u5382\u5546",
+      groupGlobal: "\u6D77\u5916\u5382\u5546",
+      groupGateway: "\u7F51\u5173 / \u805A\u5408",
+      groupMore: "\u66F4\u591A\u4F9B\u5E94\u5546",
       searchTemplates: "\u641C\u7D22\u4F9B\u5E94\u5546\u540D\u79F0\u6216\u5730\u5740",
       noTemplateMatch: "\u6CA1\u6709\u5339\u914D\u7684\u4F9B\u5E94\u5546\u6A21\u677F",
       showAllTemplates: "\u663E\u793A\u5168\u90E8",
@@ -5667,6 +5770,7 @@ window.__ModuleLoader__.load({
       keyCleared: "\u5BC6\u94A5\u5DF2\u6E05\u9664",
       needRoute: "\u8BF7\u586B\u5199\u8DEF\u7531 ID",
       needBaseURL: "Base URL \u5FC5\u987B\u4EE5 http:// \u6216 https:// \u5F00\u5934",
+      anthropicBaseHint: "\u586B\u6839\u5730\u5740\u5373\u53EF\uFF0C/v1/messages \u7531\u5BA2\u6237\u7AEF\u8865\u5168",
       // --- added for the redesigned panel -------------------------------------
       edit: "\u7F16\u8F91",
       builtin: "\u5185\u7F6E",
@@ -5675,6 +5779,9 @@ window.__ModuleLoader__.load({
       createSubmit: "\u521B\u5EFA",
       firstModel: "\u9996\u4E2A\u6A21\u578B ID",
       needFirstModel: "\u65B0\u4F9B\u5E94\u5546\u81F3\u5C11\u8981\u6709\u4E00\u4E2A\u6A21\u578B\u6761\u76EE\uFF1A\u8BF7\u586B\u5199\u9996\u4E2A\u6A21\u578B ID",
+      readModels: "\u8BFB\u53D6\u6A21\u578B",
+      pickFirstModel: "\u9009\u62E9\u6A21\u578B",
+      manualInput: "\u624B\u52A8\u8F93\u5165\u2026",
       clearKey: "\u6E05\u9664\u5BC6\u94A5",
       confirmClearKey: "\u786E\u5B9A\u6E05\u9664\u8FD9\u4E2A\u4F9B\u5E94\u5546\u7684 API \u5BC6\u94A5\uFF1F\u6E05\u9664\u540E\u65E0\u6CD5\u6062\u590D\u3002",
       clearKeyShort: "\u6E05\u9664",
@@ -5688,6 +5795,8 @@ window.__ModuleLoader__.load({
       backToProviders: "\u8FD4\u56DE\u4F9B\u5E94\u5546\u5217\u8868",
       rename: "\u91CD\u547D\u540D",
       deleteProvider: "\u5220\u9664\u4F9B\u5E94\u5546",
+      copyConfig: "\u590D\u5236\u914D\u7F6E",
+      copiedConfig: "\u914D\u7F6E\u5DF2\u590D\u5236\uFF08\u4E0D\u542B\u5BC6\u94A5\uFF09",
       providerActions: "\u66F4\u591A\u64CD\u4F5C",
       unsaved: "\u6709\u672A\u4FDD\u5B58\u7684\u66F4\u6539",
       unsavedTitle: "\u653E\u5F03\u672A\u4FDD\u5B58\u7684\u66F4\u6539\uFF1F",
@@ -5789,6 +5898,11 @@ window.__ModuleLoader__.load({
       customProvider: "Custom provider",
       customProviderHint: "Enter the Base URL and protocol manually",
       groupOther: "Other",
+      groupCommon: "Common",
+      groupCn: "China",
+      groupGlobal: "Global",
+      groupGateway: "Gateways",
+      groupMore: "More providers",
       searchTemplates: "Search provider name or endpoint",
       noTemplateMatch: "No matching provider template",
       showAllTemplates: "Show all",
@@ -5850,6 +5964,7 @@ window.__ModuleLoader__.load({
       keyCleared: "Key cleared",
       needRoute: "Route ID is required",
       needBaseURL: "Base URL must start with http:// or https://",
+      anthropicBaseHint: "Use the root URL; /v1/messages is appended for you",
       // --- added for the redesigned panel -------------------------------------
       edit: "Edit",
       builtin: "Built-in",
@@ -5858,6 +5973,9 @@ window.__ModuleLoader__.load({
       createSubmit: "Create",
       firstModel: "First model ID",
       needFirstModel: "A new provider needs at least one model: enter the first model ID",
+      readModels: "Read models",
+      pickFirstModel: "Choose a model",
+      manualInput: "Type an id\u2026",
       clearKey: "Clear key",
       confirmClearKey: "Clear this provider\u2019s API key? This cannot be undone.",
       clearKeyShort: "Clear",
@@ -5870,6 +5988,8 @@ window.__ModuleLoader__.load({
       backToProviders: "Back to providers",
       rename: "Rename",
       deleteProvider: "Delete provider",
+      copyConfig: "Copy configuration",
+      copiedConfig: "Configuration copied, keys excluded",
       providerActions: "More actions",
       unsaved: "Unsaved changes",
       unsavedTitle: "Discard unsaved changes?",

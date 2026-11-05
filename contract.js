@@ -18,6 +18,7 @@ export const METHODS = [
   'deleteProvider',
   'discoverModels',
   'testModel',
+  'exportProvider',
 ]
 
 // The strict-codec contract changed between DSH 0.1.x (registry validates

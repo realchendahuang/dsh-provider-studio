@@ -17,6 +17,9 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 - **密钥真的能看见**：官方页只写不回显；这里默认掩码，点一下就能显示、复制、更换、清除。
 - **参数不止能保住，还能改**：直接解析 profile 里的原始配置而不是 schema 投影；模型自己的 `reasoningEfforts`（思考等级）与 `compat`（兼容开关）放在模型弹窗里，供应商自己的请求头 / 传输与重试 / 图片预算放在供应商页里，各归各位。
 - **一个页面管完**：供应商、Base URL、协议、密钥、模型增删改、单模型连通性测试、从端点批量拉取模型，不用再手改 `cordis.patch.yml`。
+- **新建就能读到模型**：填好 Base URL 和密钥点「读取模型」，直接问端点要一份模型列表，从下拉里挑首个模型，不用先去别处查 model id。
+- **配置能带走**：标题右侧 `…` →「复制配置」，导出成一段可直接贴进 `cordis.patch.yml` 的 YAML；只带凭据名，不带密钥明文。
+- **探针和真实请求一致**：测试与拉取按 pi-ai 的实际路径拼 URL，并把「请求设置 → 请求头」一起发出去，不会再出现 DSH 能调通、插件报失败。
 - **新增供应商不用查文档**：内置 models.dev 全量目录里的 223 个模板（常用 / 国内 / 海外 / 网关），带品牌 logo；选一下就把 Base URL、协议、环境变量名填好。
 - **交互不将就**：就地改名、`…` 菜单、二次确认、未保存拦截、`Cmd/Ctrl+S`、右下角 Toast；Lucide 图标 + 统一动效，深色/浅色都可用。
 - **随时能退回官方页**：官方 Models 页由 bundle patch 隐藏，改一行配置就能恢复，不删包、不影响 `llm-pi-ai` / `llm-deepseek` 适配器。
@@ -131,11 +134,15 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 3. 填写表单：
    - **显示名称**：列表里显示的名字，留空则用路由 ID。
    - **路由 ID**：配置里的唯一键，只能包含字母、数字、`.`、`_`、`-`，创建后不建议改。
-   - **协议**：OpenAI 兼容（`/chat/completions`）、OpenAI Responses（`/responses`）、Anthropic Messages（`/messages`）。
-   - **Base URL**：例如 `https://api.example.com/v1`。
-   - **API Key**：可以留空，稍后在详情页补。
-   - **首个模型 ID**：至少填一个，创建后再增删。
+   - **协议**：OpenAI 兼容（`/chat/completions`）、OpenAI Responses（`/responses`）、Anthropic Messages（`/v1/messages`）。
+   - **Base URL**：OpenAI 系填到 `/v1`（如 `https://api.openai.com/v1`）；**Anthropic 填根地址**（如 `https://api.anthropic.com`），`/v1/messages` 由客户端补——填成 `…/v1` 会在输入框下方提示。
+   - **API Key**：可以留空，稍后在详情页补；填了才能用下一步的「读取模型」。
+   - **首个模型 ID**：手填 model id，或点右侧「读取模型」向端点要一份列表，从下拉里选（读不到时仍可手填）。
 4. 点「创建」，成功后自动进入该供应商的详情页。
+
+|  |
+|:---:|
+| ![新建供应商](docs/create.png)<br>选完模板、填好密钥，直接读端点模型 |
 
 ### 填写 / 更换密钥
 
@@ -145,12 +152,13 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 
 ### 拉取模型
 
-点模型区右上角的「拉取模型」，插件会用当前 Base URL + 密钥请求 `GET {baseURL}/models`，弹窗里搜索、全选或逐个勾选，点「加入所选」并入模型表——注意这时还只是草稿，点「保存」才写盘。
+点模型区右上角的「拉取模型」，插件用当前 Base URL + 密钥 + 「请求设置」里的自定义请求头去取模型列表（OpenAI 系 `GET {baseURL}/models`，Anthropic 为 `GET {root}/v1/models`），弹窗里搜索、全选或逐个勾选，点「加入所选」并入模型表——注意这时还只是草稿，点「保存」才写盘。
 
 ### 测试连通性
 
 每个模型行右侧的「测试」按钮会发一个**真实**最小请求：
 
+- 按协议发到真实路径（`{baseURL}/chat/completions`、`{baseURL}/responses`、`{baseURL}/v1/messages`），并带上「请求设置」里的自定义请求头，和 DSH 实际下发的一致；
 - 聊天类协议发 `max_tokens: 1`，Responses 类发 `max_output_tokens: 16`，Anthropic 类同理，20 秒超时；
 - 成功显示 `✓ 延迟`，失败显示红色失败徽章，鼠标悬停看具体 HTTP 错误；
 - 结果约 6 秒后自动消失。
@@ -188,6 +196,28 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 |  |
 |:---:|
 | ![删除确认](docs/confirm.png)<br>删除供应商前的二次确认（清除密钥、放弃修改同理） |
+
+### 导出配置
+
+供应商详情页标题右侧 `…` →「复制配置」，把这一条导出成可直接使用的 YAML：
+
+```yaml
+- id: llm-pi-ai
+  name: "@deepseek-ai/dsh-llm-pi-ai"
+  config:
+    providers:
+      my-gateway:
+        displayName: My Gateway
+        api: openai-completions
+        baseURL: https://api.example.com/v1
+        apiKeyEnv: MY_GATEWAY_API_KEY
+        models: ...
+```
+
+- 内容取自 profile 的 patch 文档而不是 schema 投影，手写的 `reasoningEfforts`、`compat`、请求头都会原样带出来；
+- **不含密钥**：配置里只有 `apiKeyEnv` 这个凭据名，换台机器还得重新填一次密钥；
+- 内置 DeepSeek 行同样可导出，形状是 `- id: llm-deepseek`；
+- 贴进 `cordis.patch.yml` 顶层列表即可（适合新 profile）；本机已有同名条目时，手动合并 `providers` 下那一块。
 
 ### 保存规则
 
@@ -241,14 +271,17 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 
 ### 从端点拉取模型
 
-- 用当前 Base URL + 密钥请求 `GET {baseURL}/models`，弹窗列出端点返回的模型，可搜索、全选 / 清空，勾选后批量并入模型表。
+- 用当前 Base URL + 密钥 + 自定义请求头取模型列表：OpenAI 系 `GET {baseURL}/models`，Anthropic 为 `GET {root}/v1/models`（`root` 是去掉末尾 `/v1` 的 Base URL），与 `dsh-llm-pi-ai` 自身的拉取逻辑一致。
+- 弹窗列出端点返回的模型，可搜索、全选 / 清空，勾选后批量并入模型表。
 - 同时兼容 OpenAI 风格（`data[]`）、Anthropic 风格（`data[]` / `models[]`）以及裸数组三种返回。
+- 「新增供应商」里也能用同一套逻辑（填好密钥后点「读取模型」），只是结果落到「首个模型 ID」而不是模型表。
 
 ### 模板与 logo
 
 - 「新增供应商」先进入模板选择器，模板来自 [models.dev](https://github.com/sst/models-dev) 的全量供应商目录（名称、API root、环境变量名、协议映射），共 **223 个**。
 - 其中 45 个精选条目带中文名并分组（常用 / 国内厂商 / 海外厂商 / 网关），其余 178 个在「更多供应商」组；每组默认显示 12 个、可展开，顶部搜索框可检索全部条目。
-- 模板只预填 Base URL / 协议 / 首个模型 ID。模型 ID 只是建议值，DSH 的模型目录与其他客户端不同，创建前请按账户实际可用的模型确认。
+- 模板只预填显示名 / 路由 ID / 协议 / Base URL；模型不预填——点「读取模型」按账户实际可用的型号现取。
+- Anthropic 协议的模板给的是**根地址**（如 `https://api.anthropic.com`），`/v1/messages` 由客户端补，所以不要在 Base URL 末尾再加 `/v1`。
 - 品牌 logo：图标目录里 152 个 logo 文件，覆盖 223 个模板中的 173 个（来源见「数据来源与致谢」）；没有 logo 的显示中性占位图标。
 - 需要专用 SDK 的厂商（Google、Bedrock、Azure 等）不收录，因为 DSH 的 `llm-pi-ai` 只支持上面三种协议。
 - 「常用」分组里还带一个「自定义供应商」入口，用于任意 OpenAI 兼容端点。
@@ -310,6 +343,7 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 - 新建供应商至少要有一个模型条目。删除供应商、清除密钥、放弃未保存修改都会先弹出二次确认。
 - 路由级兜底字段（`defaultContextWindow` / `defaultMaxTokens` / `defaultInput` / `reasoning` / `thinkingBudgets`）和 `modelOverrides` 没有界面，需要时手写 `cordis.patch.yml`；日常配置用模型自己的字段就够。
 - 模板与模型 ID 只是预填建议，不代表账户一定有权限调用。
+- 「复制配置」只导出单个供应商、且不含密钥；整份 profile 的配置仍以 `cordis.patch.yml` 为准。
 - 按 DSH `0.2.1-rc.5` / `0.2.2-rc.1` 实测；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 升级后可能需要适配（例如 `0.2.2` 新增的两个图片字段只在 `0.2.2+` 生效）。
 
 ## 数据来源与致谢

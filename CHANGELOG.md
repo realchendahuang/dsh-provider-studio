@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.2 — 2026-11-05
+
+把两个会说谎的探针修好，新建流程去掉「自己查 model id」，配置可以带走了。
+
+- **测试与拉取按真实请求拼装**：Anthropic 协议此前请求 `{baseURL}/messages` 与 `{baseURL}/models`，正确是 `{baseURL}/v1/messages` 和 `{root}/v1/models`（对齐 `dsh-llm-pi-ai` 的 `listingUrl` 与 Anthropic SDK 的 `/v1/messages`）
+- **探针带上「请求设置 → 请求头」**：需要额外鉴权头的网关（Azure 的 `api-key`、部分中转的 `x-api-key`）不会再被误报失败
+- **新建时直接「读取模型」**：填好 Base URL 与密钥就能问端点要列表，从下拉里选首个模型；读不到时仍可手填
+- **供应商 `…` 菜单新增「复制配置」**：按 patch 文档导出整条 YAML，可直接贴进 `cordis.patch.yml`；不含密钥明文，内置 DeepSeek 行同样可导出
+- **修正 Anthropic 协议模板的 Base URL**：8 个模板多带了 `/v1`，会和客户端补的 `/v1/messages` 叠成 `/v1/v1/messages`。旧模板多带 `/v1`、旧探针少带 `/v1`，两者恰好抵消——这也是「测试通过、真实对话 404」一直没被发现的原因。详情页遇到 `…/v1` 结尾会给出提示
+- 模板分组标题走 i18n，英文界面不再出现「常用 / 国内厂商」
+- 清掉 `listProviders` 返回给客户端的调试字段，以及每次创建供应商都会打的日志
+
 ## 1.1.1 — 2026-11-05
 
 收一轮毛刺：间距、套皮文案、内置行的小动作。

@@ -131,6 +131,10 @@ export const CSS = `
 .dpp-fieldHeadActions{display:flex;align-items:center;gap:6px}
 .dpp-count{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:5px;background:var(--dpp-fill);color:var(--dpp-fg3);font-size:10.5px;font-weight:500;font-family:inherit;letter-spacing:0}
 .dpp-formGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 14px}
+/* An input with a trailing action button, sized to the input's own height. */
+.dpp-inlineField{display:flex;align-items:center;gap:8px;min-width:0}
+.dpp-inlineField>.dpp-input{flex:1 1 auto;min-width:0;width:auto}
+.dpp-inlineField>.dpp-btn{flex:0 0 auto;height:32px}
 
 /* --------------------------------------------------------------- selectors */
 .dpp-selectMenu{position:relative}

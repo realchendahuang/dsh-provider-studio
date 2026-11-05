@@ -6,13 +6,15 @@
  * touches settings on its own.
  *
  * Host contract this file is written against:
- *   listProviders → { providers, protocols, writable, debug }
+ *   listProviders → { providers, protocols, writable }
  *     provider: { route, source, displayName, api, baseURL, apiKeyEnv,
  *                 modelCount, usesCatalog, keyConfigured, keySource, keyHint,
  *                 builtin }
  *   getProvider  → the same fields plus { models, secret, headers, extra }
  *   saveProvider → { ok, persisted, persistedDetail }
- *   createProvider / deleteProvider / discoverModels / testModel.
+ *   createProvider / deleteProvider / discoverModels / testModel / exportProvider.
+ *   discoverModels also accepts { baseURL, api, apiKey } so the create dialog
+ *   can read an endpoint's model list before the provider exists.
  *
  * The built-in DeepSeek row (source === 'deepseek') is an ordinary list row and
  * an ordinary editor; only two things change: its protocol renders as a
@@ -109,6 +111,16 @@ function protoOption(api, t) {
   const hint = PROTO_ENDPOINT[api]
   const label = protoLabel(api, t)
   return hint ? `${label} (${hint})` : label
+}
+
+/**
+ * Anthropic's SDK appends `/v1/messages` to whatever base URL the profile
+ * holds, so a trailing `/v1` here would be doubled into `/v1/v1/messages`.
+ * Only that exact mistake earns a hint; nothing else gets a nag.
+ */
+function anthropicBaseHint(api, baseURL, t) {
+  if (api !== 'anthropic-messages') return undefined
+  return /\/v1\/?$/i.test(String(baseURL || '').trim()) ? t('anthropicBaseHint') : undefined
 }
 
 /** '7 个模型' — the catalog row has no per-provider models of its own. */
@@ -1918,6 +1930,21 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     }
   }
 
+  /** Copy this provider as a paste-ready patch entry (keys are never included). */
+  const copyConfig = async () => {
+    try {
+      const result = await call('exportProvider', { route })
+      if (!result || result.ok !== true || typeof result.yaml !== 'string') {
+        pushToast('err', t('saveFailed'), result && result.error ? result.error : '')
+        return
+      }
+      await copyText(result.yaml)
+      pushToast('ok', t('copiedConfig'))
+    } catch (err) {
+      pushToast('err', t('saveFailed'), errText(err))
+    }
+  }
+
   const testModel = async (model) => {
     if (busy || readOnly || !model.id) return
     setTesting(model.id)
@@ -2006,7 +2033,14 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
     })
   }
 
+  const baseURLHint = anthropicBaseHint(draft.api, draft.baseURL, t)
+
   const menuItems = []
+  menuItems.push({
+    icon: 'copy',
+    label: t('copyConfig'),
+    onSelect: () => { void copyConfig() },
+  })
   if (!builtin) {
     menuItems.push({
       icon: 'pencil',
@@ -2092,6 +2126,7 @@ function DetailView({ t, call, route, writable, protocols, onBack, onChanged, pu
               placeholder="https://api.example.com/v1"
               onChange={(event) => setDraft({ ...draft, baseURL: event.target.value })}
             />
+            {baseURLHint !== undefined ? <span className="dpp-fieldHint">{baseURLHint}</span> : null}
           </Field>
 
           <Field label={t('protocol')}>
@@ -2315,7 +2350,7 @@ function TemplatePicker({ t, onPick, onBack }) {
         const haystack = `${template.label} ${template.displayName} ${template.baseURL} ${template.id}`
         if (!haystack.toLowerCase().includes(needle)) continue
       }
-      const name = template.group || t('groupOther')
+      const name = template.group ? t(template.group) : t('groupOther')
       if (!byGroup.has(name)) {
         byGroup.set(name, [])
         order.push(name)
@@ -2442,15 +2477,55 @@ const EMPTY_CREATE = {
   modelId: '',
 }
 
-function CreateForm({ protocols, t, onCancel, onSubmit, busy, initial }) {
+/** Select value that flips the model field back to free text. */
+const MANUAL_MODEL = '__manual__'
+
+function CreateForm({ protocols, t, call, onCancel, onSubmit, busy, initial }) {
   const [form, setForm] = React.useState(() => ({
     ...EMPTY_CREATE,
     ...(initial !== null && typeof initial === 'object' ? initial : {}),
   }))
   const [error, setError] = React.useState('')
+  // Models the endpoint reported for the values currently typed in. Empty
+  // keeps the field a plain text input, so a provider created without a key
+  // (or against an endpoint that lists nothing) still works by hand.
+  const [endpointModels, setEndpointModels] = React.useState([])
+  const [reading, setReading] = React.useState(false)
   const preset = initial !== null && typeof initial === 'object' ? initial : null
   const heading = preset !== null && preset.displayName ? preset.displayName : t('newProvider')
-  const set = (patch) => { setForm((current) => ({ ...current, ...patch })); setError('') }
+  const set = (patch) => {
+    setForm((current) => ({ ...current, ...patch }))
+    setError('')
+    // A different endpoint or key makes a fetched list meaningless.
+    if ('baseURL' in patch || 'api' in patch || 'apiKey' in patch) setEndpointModels([])
+  }
+
+  const readEndpoint = async () => {
+    setError('')
+    const baseURL = form.baseURL.trim()
+    if (!baseURL) {
+      setError(t('needBaseURL'))
+      return
+    }
+    setReading(true)
+    try {
+      const result = await call('discoverModels', { baseURL, api: form.api, apiKey: form.apiKey })
+      if (!result || result.ok !== true) {
+        setError(result && result.error ? result.error : t('discoverFailed'))
+        return
+      }
+      const list = Array.isArray(result.models) ? result.models : []
+      if (list.length === 0) {
+        setError(t('discoverEmpty'))
+        return
+      }
+      setEndpointModels(list)
+    } catch (err) {
+      setError(errText(err))
+    } finally {
+      setReading(false)
+    }
+  }
 
   const submit = async () => {
     setError('')
@@ -2487,6 +2562,7 @@ function CreateForm({ protocols, t, onCancel, onSubmit, busy, initial }) {
   }
 
   const iconKey = preset !== null && preset.icon ? preset.icon : null
+  const baseURLHint = anthropicBaseHint(form.api, form.baseURL, t)
 
   return (
     <div>
@@ -2536,6 +2612,7 @@ function CreateForm({ protocols, t, onCancel, onSubmit, busy, initial }) {
                 placeholder="https://api.example.com/v1"
                 onChange={(event) => set({ baseURL: event.target.value })}
               />
+              {baseURLHint !== undefined ? <span className="dpp-fieldHint">{baseURLHint}</span> : null}
             </Field>
             <Field label={t('apiKey')} wide>
               <input
@@ -2547,14 +2624,48 @@ function CreateForm({ protocols, t, onCancel, onSubmit, busy, initial }) {
                 onChange={(event) => set({ apiKey: event.target.value })}
               />
             </Field>
-            <Field label={t('firstModel')} wide>
-              <input
-                className="dpp-input dpp-inputMono"
-                value={form.modelId}
-                placeholder="deepseek-v4.1-flash"
-                onChange={(event) => set({ modelId: event.target.value })}
-                onKeyDown={(event) => { if (event.key === 'Enter') void submit() }}
-              />
+            <Field
+              label={t('firstModel')}
+              wide
+              hint={endpointModels.length > 0 ? `${endpointModels.length} ${t('modelCount')}` : undefined}
+            >
+              {endpointModels.length === 0 ? (
+                <div className="dpp-inlineField">
+                  <input
+                    className="dpp-input dpp-inputMono"
+                    value={form.modelId}
+                    placeholder="deepseek-v4.1-flash"
+                    onChange={(event) => set({ modelId: event.target.value })}
+                    onKeyDown={(event) => { if (event.key === 'Enter') void submit() }}
+                  />
+                  <button
+                    type="button"
+                    className="dpp-btn dpp-btnGhost dpp-btnSm"
+                    title={t('readModels')}
+                    disabled={reading || busy}
+                    onClick={() => { void readEndpoint() }}
+                  >
+                    {reading ? <Spinner size={13} /> : <Icon name="refresh-cw" size={13} />}
+                    <span>{t('readModels')}</span>
+                  </button>
+                </div>
+              ) : (
+                <SelectMenu
+                  value={form.modelId}
+                  ariaLabel={t('firstModel')}
+                  placeholder={t('pickFirstModel')}
+                  options={endpointModels
+                    .map((model) => ({ value: model.id, label: model.id }))
+                    .concat([{ value: MANUAL_MODEL, label: t('manualInput') }])}
+                  onChange={(next) => {
+                    if (next === MANUAL_MODEL) {
+                      setEndpointModels([])
+                      return
+                    }
+                    set({ modelId: next })
+                  }}
+                />
+              )}
             </Field>
           </div>
           {error !== '' ? <Alert kind="err" text={error} /> : null}
@@ -2775,6 +2886,7 @@ function PanelPageInner({ t, call }) {
       <CreateForm
         protocols={protocols}
         t={t}
+        call={call}
         busy={busy}
         initial={preset}
         onCancel={() => { setMode('template'); setDirection('out') }}
