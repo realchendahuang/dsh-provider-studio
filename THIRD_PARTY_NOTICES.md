@@ -8,11 +8,13 @@ substantial portions of the work.
 
 The package's own code is MIT-licensed; see [LICENSE](LICENSE).
 
-Runtime npm dependencies (`@deepseek-ai/dsh-typert-protocol`, `yaml`,
-`@deepseek-ai/cordis`) are installed from the npm registry as separate packages
-and keep their own license files inside `node_modules`; they are not vendored
-into this repository. Development-only tooling (esbuild, Pillow, Python) is not
-part of the published package.
+Runtime npm dependencies (`@deepseek-ai/dsh-typert-protocol`, `yaml`) are
+installed from the npm registry as separate packages and keep their own license
+files inside `node_modules`; they are not vendored into this repository.
+`@deepseek-ai/cordis` is the Host framework provided by DSH itself and is
+declared here only as an optional peer, so it is not bundled or installed by
+this package. Development-only tooling (esbuild, Pillow, Python) is not part of
+the published package.
 
 ---
 

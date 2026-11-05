@@ -13,7 +13,9 @@
  *    so we stay inert and the suite runs exactly once from host.test.mjs.
  *
  * That keeps every invocation (`node --test`, `node --test test/`, `npm test`,
- * `node --test test/host.test.mjs`) at the same single 42-test run.
+ * `node --test test/host.test.mjs`) at the same single 42-test suite. Bare
+ * `node --test` also counts this shim file itself, so it reports 43 top-level
+ * tests while still running the suite exactly once.
  */
 
 const entry = process.argv[1] ?? ''

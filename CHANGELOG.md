@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.2 — 2026-11-06
+
+补齐供应商 logo：把没有图标的模板按官网逐个找了一遍，新增 35 个真实品牌标；顺带为 Magpie 这类本地网关加上了官网图标。
+
+- **新增 35 个 logo**（全部来自官方站点）：`amd`、`scaleway`、`sarvam`、`modal`、`helicone`、`requesty`、`bothub`、`privatemode-ai`、`neuralwatt`、`tokengo`、`berget`、`mixlayer`、`moark`、`neosmith`、`boundless`、`echo`、`cloudferro-sherlock`、`agentrouter`、`ambient`、`ai-router`、`ainetcafe`、`crossmodel`、`daoxe`、`dinference`、`hpc-ai`、`llmtech`、`lucidquery`、`modelis`、`tempr`、`tokenrouter`、`unorouter`、`vancine`、`vivgrid`、`zeldoc` 等，对应模板同步加上 `icon`
+- **Magpie**：确认官网是 [usemagpie.ai](https://usemagpie.ai)，用官方 256px 图标生成 `magpie.webp`，并在 `iconForProvider` 加规则，`magpie` / `magpie-responses` 这类本地网关行不再显示首字母
+- **抓取脚本更可靠**：不再要求 models.dev 缓存（缺缓存时直接用模板里的 baseURL）；支持 `data:` 图标；接受单色与 16px favicon；拒绝空白占位、拒绝 loopback/内网地址；抓错站点或抓到营销横幅的（AMD 首页 og-image、待售域名、GoDaddy 占位图标等）人工复核后剔除
+- **门禁**：`check.mjs` 把 `iconForProvider` 的规则也算作图标引用，Magpie 这类无模板图标不再误报孤儿；体积预算按新增 logo 上调（client 640 KB / icons 340 KB）
+- 仍有 17 个模板没有可靠官网图标（站点 403/超时/域名待售或只有 16px 占位），继续走首字母兜底
+- **发版配套校正**：README 的安装命令固定到 `v1.2.2`，模板 / logo 数字按实测更新（218 个模板、184 个内联 logo）；`@deepseek-ai/dsh-typert-protocol` 依赖范围补上 `^0.2.2-rc.1`（两份实现字节相同，0.2.2 环境下不再多装一份），cordis peer 放宽为 `>=4.0.5 <5.0.0`；README 注明插件面向 web / desktop profile
+
 ## 1.2.1 — 2026-11-05
 
 深色模式下那一套图标收口：不再有固定浅灰的单色 logo、不再有被同色面板吃掉的品牌标，尺寸参差的 favicon 也统一了光学大小。
