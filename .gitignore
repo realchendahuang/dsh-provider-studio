@@ -6,6 +6,10 @@ node_modules/
 # tracked — the plugin loader reads it directly on install.
 dist/
 
+# Python bytecode from the icon scripts
+__pycache__/
+*.pyc
+
 # OS / editor noise
 .DS_Store
 .idea/

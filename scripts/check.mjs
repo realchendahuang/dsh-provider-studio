@@ -28,10 +28,11 @@ const requireFromRoot = createRequire(join(ROOT, 'package.json'))
 
 const BUDGETS = {
   // client.js is shipped to every install; v1.1.2 was 618,437 B with PNG logos,
-  // v1.2 moves the rasters to 48px WebP and should land well under 600 KB.
-  clientBytes: 600 * 1024,
+  // v1.2 moved the rasters to 48px WebP and v1.2.2 adds 35 fetched logos, so the
+  // budget keeps ~10% headroom over the current ~570 KB rather than freezing it.
+  clientBytes: 640 * 1024,
   // src/client/icons.js is the generated logo table (also inlined into client.js).
-  iconsBytes: 300 * 1024,
+  iconsBytes: 340 * 1024,
 }
 
 const tty = process.stdout.isTTY === true
@@ -363,7 +364,23 @@ if (Array.isArray(templatesModule.value) && iconKeys.length > 0) {
   check('every template icon exists', missing.length === 0,
     missing.length === 0 ? '0 orphans' : missing.slice(0, 5).map((template) => `${template.id || template.label} → ${template.icon}`).join(', ') + (missing.length > 5 ? ` … +${missing.length - 5}` : ''))
 
+  // Logos can be referenced two ways: an explicit preset icon, or one of the
+  // matching rules `iconForProvider` uses for saved/third-party providers. The
+  // data-module loader keeps one export, so read the rule table directly.
+  const rules = await (async () => {
+    try {
+      const namespace = await import(pathToFileURL(join(ROOT, 'src/client/icons.js')).href)
+      return namespace.PROVIDER_ICON_RULES
+    } catch {
+      return undefined
+    }
+  })()
   const referenced = new Set(templatesModule.value.map((template) => template?.icon).filter(Boolean))
+  if (Array.isArray(rules)) {
+    for (const rule of rules) {
+      if (Array.isArray(rule) && typeof rule[0] === 'string') referenced.add(rule[0])
+    }
+  }
   const orphanIcons = iconKeys.filter((key) => !referenced.has(key))
   if (orphanIcons.length > 0) {
     warn('unreferenced icons', `${orphanIcons.slice(0, 8).join(', ')}${orphanIcons.length > 8 ? ` … +${orphanIcons.length - 8}` : ''}`)

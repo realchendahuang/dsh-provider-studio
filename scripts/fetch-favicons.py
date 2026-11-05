@@ -13,6 +13,7 @@ Usage: python3 scripts/fetch-favicons.py
 """
 
 import concurrent.futures
+import base64
 import io
 import ipaddress
 import json
@@ -43,6 +44,11 @@ LIMIT = 2_000_000
 
 
 def fetch(url, timeout=8):
+    if url.startswith('data:'):
+        header, _, payload = url[5:].partition(',')
+        if 'base64' in header:
+            return base64.b64decode(payload), header
+        return urllib.parse.unquote_to_bytes(payload), header
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=timeout, context=CTX) as resp:
         data = resp.read(LIMIT + 1)
@@ -140,11 +146,18 @@ def normalise(data):
                 best = (image.size[0], image.copy())
         image = best[1]
     image = image.convert('RGBA')
-    if min(image.size) < 24:
+    if min(image.size) < 16:
+        return None  # 16px is the smallest still-legible favicon
+    # Reject only a truly uniform image: monochrome brand marks (AMD, OpenAI
+    # style) are legitimate, antialiasing gives real icons a second shade.
+    # Composite onto white first: a transparent monochrome mark would otherwise
+    # look like one uniform colour and get rejected as a blank placeholder.
+    flattened = Image.alpha_composite(Image.new('RGBA', image.size, (255, 255, 255, 255)), image)
+    colours = flattened.convert('RGB').resize((16, 16)).getcolors(maxcolors=1024)
+    # None means "more colours than the cap" — a photo-like mark, definitely not
+    # blank; only an actually uniform image is a placeholder.
+    if colours is not None and len(colours) < 2:
         return None
-    colours = image.convert('RGB').getcolors(maxcolors=256)
-    if colours is None or len(colours) < 4:
-        return None  # blank or single-colour placeholder
     # Trim the transparent padding favicons ship with: the panel draws these at
     # 22px, so a mark that fills half the canvas ends up as a speck. Re-centre
     # the visible mark so it covers CONTENT of CANVAS (see normalize-icons.py).
@@ -167,7 +180,13 @@ def work(item):
         href = declared_icon(host)
         if href:
             urls.append(href)
-        urls += [f'https://{host}/favicon.ico', f'https://{host}/apple-touch-icon.png']
+        urls += [
+            f'https://{host}/apple-touch-icon.png',
+            f'https://{host}/apple-touch-icon-precomposed.png',
+            f'https://{host}/android-chrome-192x192.png',
+            f'https://{host}/favicon.ico',
+            f'https://{host}/favicon.png',
+        ]
         for url in urls:
             try:
                 data, _ = fetch(url)
@@ -182,6 +201,7 @@ def work(item):
             if icon is None:
                 continue
             icon.save(os.path.join(ICONS, pid + '.webp'), 'WEBP', **WEBP_OPTIONS)
+            print(f'  {pid} <- {url}', flush=True)
             # New rasters need a tone entry for the client's contrast plates.
             print('  rerun python3 scripts/icon-tones.py after adding favicons', flush=True)
             stale = os.path.join(ICONS, pid + '.png')
@@ -207,8 +227,10 @@ def missing_icons():
                 pid = re.search(r"\{ id: '([^']+)'", line)
                 if pid is None:
                     continue
-                entries.append((pid.group(1), re.search(r"icon: '([^']+)'", line) is not None))
-    return [pid for pid, has_icon in entries if not has_icon]
+                has_icon = re.search(r"icon: '([^']+)'", line) is not None
+                base = re.search(r"baseURL: '([^']+)'", line)
+                entries.append((pid.group(1), has_icon, base.group(1) if base else ''))
+    return [(pid, base) for pid, has_icon, base in entries if not has_icon]
 
 
 def main():
@@ -217,13 +239,21 @@ def main():
             'this Pillow has no WebP support (needs libwebp): upgrade Pillow, then rerun. '
             'Do not fall back to PNG — icons are inlined as WebP data URLs.'
         )
-    providers = json.load(open('/tmp/providers.json'))
-    md = json.load(open('/tmp/models-dev.json'))
+    # The models.dev caches add documentation hosts for some presets, but they
+    # are optional: the preset base URLs in src/client/templates/ are enough.
+    try:
+        providers = json.load(open('/tmp/providers.json'))
+    except (OSError, ValueError):
+        providers = {}
+    try:
+        md = json.load(open('/tmp/models-dev.json'))
+    except (OSError, ValueError):
+        md = {}
     todo = []
-    for pid in missing_icons():
+    for pid, preset_base in missing_icons():
         info = providers.get(pid) or {}
         doc = (md.get(pid) or {}).get('doc') or ''
-        base = info.get('baseURL') or (md.get(pid) or {}).get('api') or ''
+        base = info.get('baseURL') or (md.get(pid) or {}).get('api') or preset_base or ''
         todo.append((pid, doc, base))
     print(f'providers to try: {len(todo)}', flush=True)
 

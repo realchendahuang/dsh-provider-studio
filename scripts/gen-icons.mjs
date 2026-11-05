@@ -112,7 +112,8 @@ export const PROVIDER_ICON_FRAMES = {
 ${Object.keys(frames).sort().map((name) => `  ${JSON.stringify(name)}: ${JSON.stringify(frames[name])},`).join('\n')}
 }
 
-const RULES = [
+export const PROVIDER_ICON_RULES = [
+  ['magpie', ['magpie']],
   ['deepseek', ['deepseek']],
   ['bigmodel', ['bigmodel', 'zhipu', 'open.bigmodel']],
   ['zai', ['z.ai', 'zai-', '/zai']],
@@ -138,7 +139,7 @@ export function iconForProvider(item) {
   if (item === null || item === undefined) return null
   const haystack = \`\${item.route || ''} \${item.displayName || ''} \${item.baseURL || ''}\`.toLowerCase()
   if (haystack.trim() === '') return null
-  for (const [key, needles] of RULES) {
+  for (const [key, needles] of PROVIDER_ICON_RULES) {
     if (needles.some((needle) => haystack.includes(needle))) return key
   }
   return null
