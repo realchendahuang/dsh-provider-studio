@@ -73,7 +73,7 @@
     "test:coverage": "node scripts/coverage.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-typert-protocol": "^0.2.1-rc.5 || ^0.2.2-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": "^0.2.2-alpha.3",
     "yaml": "^2.9.1"
   },
   "repository": {
