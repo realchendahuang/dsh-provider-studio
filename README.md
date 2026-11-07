@@ -398,12 +398,12 @@ python3 scripts/fetch-favicons.py  # 为缺 logo 的模板抓官网 favicon（�
 发布走两段式脚本（tag 推到远端后不可重打，所以 `prepare` 只做本地可回退的部分）：
 
 ```bash
-node scripts/release.mjs prepare 1.3.1 --title "一句话标题" --notes /tmp/notes.md
+node scripts/release.mjs prepare 1.3.2 --notes /tmp/notes.md
 # 检查 git show --stat HEAD 与 tag 后：
 node scripts/release.mjs publish
 ```
 
-`prepare` 会校验版本递增与工作区干净、插入 CHANGELOG、同步 `package.json` / `package-lock` / README 的 `#vX.Y.Z`、跑门禁、commit 并打 annotated tag；`publish` 在确认远端没有同名 tag、门禁重跑通过后原子推送 `main` 与 tag，等 CI 绿再用 CHANGELOG 段落建 GitHub Release。
+`prepare` 会校验版本递增与工作区干净、插入 CHANGELOG、同步 `package.json` / `package-lock` / README 的 `#vX.Y.Z`、跑门禁、commit 并打 annotated tag；`publish` 在确认远端没有同名 tag、门禁重跑通过后原子推送 `main` 与 tag，等 CI 绿再用 CHANGELOG 段落建 GitHub Release。Release 标题就是 tag 本身（`vX.Y.Z`），正文来自 CHANGELOG 对应段落；需要给 tag 加说明时才传可选的 `--title`。
 
 - `client.js` 由 `scripts/build-client.mjs` 用 esbuild 打成 CJS，再包进 `window.__ModuleLoader__.load` 的 factory；React 由 DSH 的模块表提供，不打进 bundle。Node 22 + esbuild 0.25（`package-lock` 锁定）可复现，构建失败不会留下半个 `client.js`（临时文件 + rename）。
 - `scripts/check.mjs` 不写盘：它调用 `build-client.mjs` 暴露的同一套 esbuild 配置在内存里重建 `client.js`，与提交产物逐字节比对；版本、`engines.dsh` 上界、`files` 白名单、`cordis.patch.yml`、模板↔图标孤儿、logo 资源存在与内容哈希、`node --check`、体积预算（client / icons / assets / docs）也都在这一步。`--no-build` 可跳过重建比对（例如没装 `node_modules`），CI 里不允许用它。CI（`.github/workflows/check.yml`）跑 `npm ci` → `npm run check` → `npm test`。

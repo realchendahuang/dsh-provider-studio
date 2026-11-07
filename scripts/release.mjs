@@ -5,7 +5,7 @@
  * README: a tag that reached the remote can never be re-cut, so this splits the
  * release into a reversible half and an irreversible one:
  *
- *   node scripts/release.mjs prepare 1.2.5 --title "…" --notes notes.md
+ *   node scripts/release.mjs prepare 1.2.5 --notes notes.md [--title "…"]
  *       bump package.json / package-lock / README install tags, insert the
  *       CHANGELOG section, run the gate + tests, commit, create the annotated
  *       tag — nothing is pushed yet, so `git reset --hard HEAD~1 && git tag -d`
@@ -17,8 +17,9 @@
  *       the GitHub release from the CHANGELOG section. It aborts *before* any
  *       push when the remote already has the tag.
  *
- * The release title becomes the tag message subject; `publish` prefixes it with
- * `v<version> · `, matching the existing releases.
+ * Release titles are exactly the tag (`v1.2.5`) — no decoration, no rewritten
+ * summary. `--title` only annotates the git tag itself; the CHANGELOG section
+ * is the release body.
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -120,8 +121,7 @@ function runGate(message = 'release gate') {
 function prepare(args) {
   const version = args[0]
   const flags = parseFlags(args.slice(1))
-  if (version === undefined || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) fail('usage: prepare <x.y.z> --title "…" --notes file.md')
-  if (flags.title === undefined) fail('--title is required')
+  if (version === undefined || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) fail('usage: prepare <x.y.z> --notes file.md [--title "…"]')
   if (flags.notes === undefined) fail('--notes <file.md> is required (the release body, inserted into CHANGELOG)')
 
   const current = packageVersion()
@@ -166,7 +166,7 @@ function prepare(args) {
   console.log('\n▸ commit + tag')
   run('git', ['add', '-A'])
   run('git', ['commit', '-m', `Release ${version}`])
-  run('git', ['tag', '-a', tagName(version), '-m', flags.title])
+  run('git', ['tag', '-a', tagName(version), '-m', flags.title ?? tagName(version)])
 
   console.log(`\nprepared ${tagName(version)} locally — nothing pushed.`)
   console.log('review `git show --stat HEAD`, then run:')
@@ -218,11 +218,10 @@ function publish() {
   if (body === null) fail(`CHANGELOG has no ${version} section to publish`)
   const notesPath = join(ROOT, '.git', 'release-notes.md')
   writeFileSync(notesPath, `${body}\n`)
-  const subject = run('git', ['tag', '-l', '--format=%(contents:subject)', tag], { quiet: true }).stdout
-  const title = subject === '' ? `${tag} · ${version}` : `${tag} · ${subject}`
-  run('gh', ['release', 'create', tag, '--verify-tag', '--title', title, '--notes-file', notesPath])
+  // Title is the bare tag; the changelog section is the body.
+  run('gh', ['release', 'create', tag, '--verify-tag', '--title', tag, '--notes-file', notesPath])
 
-  console.log(`\npublished ${title}`)
+  console.log(`\npublished ${tag}`)
   console.log('verify the install path from the tag:')
   console.log(`  DSH_HOME=$(mktemp -d) dsh plugin --profile web add github:realchendahuang/dsh-provider-studio#${tag}`)
 }
@@ -232,6 +231,6 @@ function publish() {
 if (command === 'prepare') prepare(rest)
 else if (command === 'publish') publish()
 else {
-  console.error('usage: release.mjs prepare <x.y.z> --title "…" --notes file.md | release.mjs publish')
+  console.error('usage: release.mjs prepare <x.y.z> --notes file.md [--title "…"] | release.mjs publish')
   process.exit(1)
 }
