@@ -44,7 +44,7 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 
 ```bash
 # 1. 装到桌面版 profile（带 tag 固定到本次发布）
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.0
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.1
 
 # 2. 完全退出 DSH 再重新打开（不是刷新窗口）
 
@@ -62,12 +62,12 @@ DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`�
 ### 方式一：直接从 GitHub 安装（推荐）
 
 ```bash
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.0
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.1
 ```
 
 - `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
-- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.3.0`。
-- **建议带 tag**：`#v1.3.0` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
+- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.3.1`。
+- **建议带 tag**：`#v1.3.1` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
 - pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
 
 ### 方式二：克隆到本地（开发 / 改代码）
@@ -101,7 +101,7 @@ dsh plugin --profile desktop why dsh-provider-studio
 
 ```bash
 dsh plugin --profile desktop remove dsh-provider-studio
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.0
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.1
 ```
 
 - **本地 link 安装**：`git pull` 后按需构建：

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1 — 2026-11-07
+
+修掉 v1.3.0 CI 矩阵里的 Windows 专属门禁误报，并让发布脚本只等 release gate 的 run。
+
+- **门禁**：`no stray icon assets` 在 Windows 上把 `assets\icons\...` 的反斜杠路径当成未引用资源，184 个 logo 全被判为孤儿，windows 矩阵因此红；改为统一按 `/` 比较（仅影响门禁判定，v1.3.0 的功能与产物本身没有变化）
+- **`scripts/release.mjs`**：`publish` 等 CI 时按 `--workflow check.yml` 过滤，避免与同一提交上的 tag guard run 混淆、误把「守卫绿」当「门禁绿」
+
 ## 1.3.0 — 2026-11-07
 
 启动包大瘦身：logo 从 `client.js` 挪到随包资源按需加载，启动时不再传输 300 KB 图标；同时补覆盖率门禁、发布脚本与 CI 矩阵。
