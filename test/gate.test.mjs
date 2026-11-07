@@ -10,7 +10,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { escapeRegExp, installTagRefs, localImageRefs, matchesFileEntry } from '../scripts/gate-utils.mjs'
+import { escapeRegExp, installTagRefs, localImageRefs, matchesFileEntry, toPosixPath } from '../scripts/gate-utils.mjs'
 
 test('matchesFileEntry: exact names, directory prefixes and globs', () => {
   assert.equal(matchesFileEntry('index.js', 'index.js'), true)
@@ -52,6 +52,13 @@ test('installTagRefs: distinct versions, prereleases included', () => {
   ].join('\n')
   assert.deepEqual(installTagRefs(markdown), ['1.2.4', '1.2.5-rc.1'])
   assert.deepEqual(installTagRefs('no tags'), [])
+})
+
+test('toPosixPath folds Windows separators for manifest comparisons', () => {
+  // Windows CI walkFiles yields backslashes; `files[]` entries always use `/`.
+  assert.equal(toPosixPath('docs\\zh\\install.md'), 'docs/zh/install.md')
+  assert.equal(toPosixPath('docs/zh/install.md'), 'docs/zh/install.md')
+  assert.equal(toPosixPath('README.md'), 'README.md')
 })
 
 test('escapeRegExp escapes every regexp metacharacter', () => {

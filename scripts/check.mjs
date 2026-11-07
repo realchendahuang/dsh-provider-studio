@@ -21,7 +21,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { installTagRefs, localImageRefs, matchesFileEntry } from './gate-utils.mjs'
+import { installTagRefs, localImageRefs, matchesFileEntry, toPosixPath } from './gate-utils.mjs'
 
 // ---------------------------------------------------------------- environment
 
@@ -127,7 +127,9 @@ async function walkFiles(dir) {
   return found
 }
 
-const rel = (path) => path.slice(ROOT.length + 1)
+// Every relative path the gate compares or prints is written in the manifest's
+ // `/` form, whatever separator the platform produced.
+ const rel = (path) => toPosixPath(path.slice(ROOT.length + 1))
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`
 
 // -------------------------------------------------------------------- manifest
@@ -660,7 +662,7 @@ check(
 // plus README.zh.md, and docs/<page>.md plus docs/zh/<page>.md.
 const missingMirrors = []
 for (const file of docsPages) {
-  const fromDocs = relative(docsDir, file)
+  const fromDocs = toPosixPath(relative(docsDir, file))
   const counterpart = fromDocs.startsWith('zh/') ? join(docsDir, fromDocs.slice(3)) : join(docsDir, 'zh', fromDocs)
   if (!existsSync(counterpart)) missingMirrors.push(`docs/${fromDocs}`)
 }

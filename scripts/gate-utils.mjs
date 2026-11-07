@@ -8,6 +8,14 @@
  * gate's own logic from rotting while the gate keeps reporting green.
  */
 
+/**
+ * A workspace path in the `/` form the package manifest uses: Windows separators
+ * are folded, so `docs\zh\install.md` compares equal to `docs/zh/install.md`.
+ * @param {string} path
+ * @returns {string}
+ */
+export const toPosixPath = (path) => String(path).replace(/\\/g, '/')
+
 /** Escape a literal string for use inside a RegExp. */
 export const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
