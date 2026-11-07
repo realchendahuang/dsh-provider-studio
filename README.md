@@ -42,6 +42,10 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 
 ## 快速开始
 
+桌面版：侧栏「插件」→ 右上「添加插件」→ 粘贴 `github:realchendahuang/dsh-provider-studio#v1.3.1` → 「安装」→ 完整退出并重启 DSH。
+
+命令行等价写法：
+
 ```bash
 # 1. 装到桌面版 profile（带 tag 固定到本次发布）
 dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.1
@@ -59,7 +63,21 @@ dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3
 
 DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`，所以命令里的 `--profile` 要和你实际启动的那个一致。
 
-### 方式一：直接从 GitHub 安装（推荐）
+### 方式一：桌面端图形界面（推荐）
+
+侧栏「插件」→ 右上「添加插件」，把整段粘贴进输入框：
+
+```
+github:realchendahuang/dsh-provider-studio#v1.3.1
+```
+
+「安装源」保持默认 → 「安装」→ 装完点「立即启用」→ 完整退出并重启 DSH。
+
+- 也可以粘 `https://github.com/realchendahuang/dsh-provider-studio#v1.3.1`，效果相同；`#v1.3.1` 固定到这次发布，去掉它就跟随 `main` 的最新提交。
+- 图形界面和下面的命令行是同一套安装逻辑（都走 `pluginManager.installBundle`），界面只是多了安装前预检、pnpm 输出、失败原因与重试，以及 pnpm 拦下构建脚本时的「允许这些脚本并重试」。
+- 对话框的「安装源」只决定 npm 注册表（包名查询与依赖下载）；Git 安装的代码本身仍从 GitHub 拉，GitHub 连不上时它提示「改用国内镜像」，但镜像只顶 npm 包，顶不了 GitHub 源码。
+
+### 方式二：直接从 GitHub 安装（命令行）
 
 ```bash
 dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.1
@@ -70,7 +88,7 @@ dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3
 - **建议带 tag**：`#v1.3.1` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
 - pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
 
-### 方式二：克隆到本地（开发 / 改代码）
+### 方式三：克隆到本地（开发 / 改代码）
 
 ```bash
 git clone https://github.com/realchendahuang/dsh-provider-studio.git ~/code/dsh-provider-studio
@@ -400,10 +418,11 @@ python3 scripts/fetch-favicons.py  # 为缺 logo 的模板抓官网 favicon（�
 ```bash
 node scripts/release.mjs prepare 1.3.2 --notes /tmp/notes.md
 # 检查 git show --stat HEAD 与 tag 后：
-node scripts/release.mjs publish
+node scripts/release.mjs publish          # 也可 --no-npm 跳过 npm
+node scripts/release.mjs npm              # 只补发 npm（远端已有同名 tag 时）
 ```
 
-`prepare` 会校验版本递增与工作区干净、插入 CHANGELOG、同步 `package.json` / `package-lock` / README 的 `#vX.Y.Z`、跑门禁、commit 并打 annotated tag；`publish` 在确认远端没有同名 tag、门禁重跑通过后原子推送 `main` 与 tag，等 CI 绿再用 CHANGELOG 段落建 GitHub Release。Release 标题就是 tag 本身（`vX.Y.Z`），正文来自 CHANGELOG 对应段落；需要给 tag 加说明时才传可选的 `--title`。
+`prepare` 会校验版本递增与工作区干净、插入 CHANGELOG、同步 `package.json` / `package-lock` / README 的 `#vX.Y.Z`、跑门禁、commit 并打 annotated tag；`publish` 在确认远端没有同名 tag、门禁重跑通过后原子推送 `main` 与 tag，等 CI 绿再用 CHANGELOG 段落建 GitHub Release，最后把同名版本发到 npm（需要 `npm login`，且 `package.json` 不能有 `private`；工作区不干净、远端没有同名 tag 或版本已发过都会被拒绝/跳过）。Release 标题就是 tag 本身（`vX.Y.Z`），正文来自 CHANGELOG 对应段落；需要给 tag 加说明时才传可选的 `--title`。
 
 - `client.js` 由 `scripts/build-client.mjs` 用 esbuild 打成 CJS，再包进 `window.__ModuleLoader__.load` 的 factory；React 由 DSH 的模块表提供，不打进 bundle。Node 22 + esbuild 0.25（`package-lock` 锁定）可复现，构建失败不会留下半个 `client.js`（临时文件 + rename）。
 - `scripts/check.mjs` 不写盘：它调用 `build-client.mjs` 暴露的同一套 esbuild 配置在内存里重建 `client.js`，与提交产物逐字节比对；版本、`engines.dsh` 上界、`files` 白名单、`cordis.patch.yml`、模板↔图标孤儿、logo 资源存在与内容哈希、`node --check`、体积预算（client / icons / assets / docs）也都在这一步。`--no-build` 可跳过重建比对（例如没装 `node_modules`），CI 里不允许用它。CI（`.github/workflows/check.yml`）跑 `npm ci` → `npm run check` → `npm test`。

@@ -171,6 +171,14 @@ check(
   !Object.hasOwn(pkg.scripts ?? {}, 'prepare'),
   Object.hasOwn(pkg.scripts ?? {}, 'prepare') ? 'git installs would need build approval' : 'install stays build-free',
 )
+
+// `npm publish` is now a release step, and a `private` field makes it refuse
+// with EPRIVATE — fail here instead of at the end of a release run.
+check(
+  'package is publishable',
+  pkg.private !== true,
+  pkg.private === true ? '"private": true — `npm publish` would fail with EPRIVATE' : 'not private',
+)
 for (const script of ['build:client', 'check', 'test', 'test:coverage', 'gen:icons']) {
   check(`scripts.${script}`, typeof pkg.scripts?.[script] === 'string', pkg.scripts?.[script] ?? 'missing')
 }

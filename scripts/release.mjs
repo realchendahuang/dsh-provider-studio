@@ -11,11 +11,17 @@
  *       tag — nothing is pushed yet, so `git reset --hard HEAD~1 && git tag -d`
  *       still undoes it.
  *
- *   node scripts/release.mjs publish
+ *   node scripts/release.mjs publish [--no-npm]
  *       refuse unless the tree is clean and `main` is at HEAD, re-run the gate,
  *       push main + tag atomically, wait for the CI run to go green, then create
- *       the GitHub release from the CHANGELOG section. It aborts *before* any
- *       push when the remote already has the tag.
+ *       the GitHub release from the CHANGELOG section, then `npm publish`. It
+ *       aborts *before* any push when the remote already has the tag.
+ *
+ *   node scripts/release.mjs npm
+ *       publish the current package version to npm without re-running the push:
+ *       for backfilling a version whose GitHub release already exists. Refuses
+ *       when `private` is set, the tree is dirty, the remote tag is missing, or
+ *       npm is not logged in; skips when the registry already lists the version.
  *
  * Release titles are exactly the tag (`v1.2.5`) — no decoration, no rewritten
  * summary. `--title` only annotates the git tag itself; the CHANGELOG section
@@ -110,6 +116,12 @@ function ensureRemoteTagAbsent(version) {
   if (remote !== '') fail(`${ref} already exists on origin — tags are immutable; bump the version instead`)
 }
 
+function ensureRemoteTagPresent(version) {
+  const ref = `refs/tags/${tagName(version)}`
+  const remote = run('git', ['ls-remote', '--tags', 'origin', ref], { quiet: true, allowFailure: true }).stdout
+  if (remote === '') fail(`${ref} is not on origin yet — publish the GitHub release before npm`)
+}
+
 function runGate(message = 'release gate') {
   console.log(`\n▸ ${message}`)
   run('npm', ['test'])
@@ -175,7 +187,9 @@ function prepare(args) {
 
 // --------------------------------------------------------------------- publish
 
-function publish() {
+function publish(args = []) {
+  const unexpected = args.filter((arg) => arg !== '--no-npm')
+  if (unexpected.length > 0) fail(`unexpected argument: ${unexpected[0]}`)
   const version = packageVersion()
   const tag = tagName(version)
   ensureCleanTree()
@@ -222,15 +236,70 @@ function publish() {
   run('gh', ['release', 'create', tag, '--verify-tag', '--title', tag, '--notes-file', notesPath])
 
   console.log(`\npublished ${tag}`)
+  if (!args.includes('--no-npm')) publishToNpm()
   console.log('verify the install path from the tag:')
   console.log(`  DSH_HOME=$(mktemp -d) dsh plugin --profile web add github:realchendahuang/dsh-provider-studio#${tag}`)
+}
+
+// ------------------------------------------------------------------------ npm
+
+/** Whether the registry lists `name@version`; a missing package answers non-zero. */
+function npmHas(name, version) {
+  const view = run('npm', ['view', `${name}@${version}`, 'version'], { quiet: true, allowFailure: true })
+  return view.code === 0 && view.stdout === version
+}
+
+/**
+ * Publish the version in package.json to npm.
+ *
+ * npm is a second install channel next to the GitHub tag, so this refuses to
+ * publish anything the tag cannot back, and stays idempotent: a version the
+ * registry already lists is reported, never re-pushed.
+ */
+function publishToNpm() {
+  const manifest = readJson('package.json')
+  const { name, version } = manifest
+  if (manifest.private === true) fail('package.json sets "private": true — `npm publish` refuses with EPRIVATE')
+  ensureCleanTree()
+  ensureRemoteTagPresent(version)
+
+  const head = run('git', ['rev-parse', 'HEAD'], { quiet: true }).stdout
+  const tagCommit = run('git', ['rev-list', '-n', '1', tagName(version)], { quiet: true, allowFailure: true })
+  if (tagCommit.code === 0 && tagCommit.stdout !== head) {
+    console.log(`  note: HEAD ${head.slice(0, 7)} carries commits after ${tagName(version)}; the tarball includes them`)
+  }
+
+  const whoami = run('npm', ['whoami'], { quiet: true, allowFailure: true })
+  if (whoami.code !== 0) fail('npm is not logged in — run `npm login`, then retry `node scripts/release.mjs npm`')
+
+  if (npmHas(name, version)) {
+    console.log(`\n▸ npm: ${name}@${version} is already published — nothing to do`)
+    return
+  }
+
+  console.log(`\n▸ npm publish ${name}@${version}`)
+  const publishArgs = ['publish']
+  // An unscoped package is public by default; a scope needs the flag explicitly.
+  if (name.startsWith('@')) publishArgs.push('--access', 'public')
+  run('npm', publishArgs)
+
+  // The registry can take a moment to answer for a version it just accepted.
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (npmHas(name, version)) {
+      console.log(`  registry lists ${name}@${version}`)
+      return
+    }
+    spawnSync('sleep', ['3'])
+  }
+  fail(`npm publish reported success but the registry does not list ${name}@${version} — re-run \`node scripts/release.mjs npm\``)
 }
 
 // ------------------------------------------------------------------------ main
 
 if (command === 'prepare') prepare(rest)
-else if (command === 'publish') publish()
+else if (command === 'publish') publish(rest)
+else if (command === 'npm') publishToNpm()
 else {
-  console.error('usage: release.mjs prepare <x.y.z> --notes file.md [--title "…"] | release.mjs publish')
+  console.error('usage: release.mjs prepare <x.y.z> --notes file.md [--title "…"] | release.mjs publish [--no-npm] | release.mjs npm')
   process.exit(1)
 }
