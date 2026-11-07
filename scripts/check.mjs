@@ -457,7 +457,8 @@ if (Array.isArray(templatesModule.value) && iconKeys.length > 0) {
     )
     const referencedNames = new Set(refs.map(({ ref }) => (ref === null ? '' : ref.slice(ASSET_PREFIX.length))))
     const stray = assetFiles
-      .map((file) => rel(file).replace(/^assets\/icons\//, ''))
+      // Windows walkFiles yields backslashes; compare in the manifest's `/` form.
+      .map((file) => rel(file).replace(/\\/g, '/').replace(/^assets\/icons\//, ''))
       .filter((name) => !referencedNames.has(name))
     check(
       'no stray icon assets',

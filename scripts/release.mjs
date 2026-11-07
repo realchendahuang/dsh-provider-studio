@@ -198,7 +198,9 @@ function publish() {
   let databaseId
   for (let attempt = 0; attempt < 30 && databaseId === undefined; attempt += 1) {
     if (attempt > 0) spawnSync('sleep', ['2'])
-    const runList = run('gh', ['run', 'list', '--limit', '5', '--json', 'databaseId,headSha,status'], { quiet: true, allowFailure: true })
+    // Only the release gate decides whether the tag is shippable; the tag guard
+    // workflow is a second run on the same commit and must not be mistaken for it.
+    const runList = run('gh', ['run', 'list', '--workflow', 'check.yml', '--limit', '5', '--json', 'databaseId,headSha,status'], { quiet: true, allowFailure: true })
     try {
       const runs = JSON.parse(runList.stdout)
       const match = runs.find((entry) => entry.headSha === head)
