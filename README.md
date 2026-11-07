@@ -28,22 +28,22 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 
 |  |  |
 |:---:|:---:|
-| ![供应商列表](docs/list.png)<br>供应商列表：只显示名字，点进二级页 | ![供应商详情](docs/detail.png)<br>供应商详情：URL、协议、密钥、模型一页管完 |
-| ![模板选择器](docs/templates.png)<br>模板选择器：218 个模板，201 个带品牌 logo | ![拉取模型](docs/discover.png)<br>拉取模型：搜索、全选、批量加入 |
-| ![编辑模型](docs/model-dialog.png)<br>编辑模型：基础字段 + 模型自己的高级（思考等级） | ![兼容开关](docs/model-compat.png)<br>模型高级里的兼容开关：按协议列出可覆盖字段 |
-| ![请求设置](docs/request-settings.png)<br>请求设置：请求头、传输与重试、图片预算 | ![协议选择](docs/select.png)<br>协议选择：自绘下拉，不调系统菜单 |
+| ![供应商列表](docs/list.webp)<br>供应商列表：只显示名字，点进二级页 | ![供应商详情](docs/detail.webp)<br>供应商详情：URL、协议、密钥、模型一页管完 |
+| ![模板选择器](docs/templates.webp)<br>模板选择器：218 个模板，201 个带品牌 logo | ![拉取模型](docs/discover.webp)<br>拉取模型：搜索、全选、批量加入 |
+| ![编辑模型](docs/model-dialog.webp)<br>编辑模型：基础字段 + 模型自己的高级（思考等级） | ![兼容开关](docs/model-compat.webp)<br>模型高级里的兼容开关：按协议列出可覆盖字段 |
+| ![请求设置](docs/request-settings.webp)<br>请求设置：请求头、传输与重试、图片预算 | ![协议选择](docs/select.webp)<br>协议选择：自绘下拉，不调系统菜单 |
 
 保存结果以右下角提示呈现，不打断当前页面：
 
 |  |
 |:---:|
-| ![保存提示](docs/toast.png)<br>保存提示：右下角 Toast，成功/失败都有 |
+| ![保存提示](docs/toast.webp)<br>保存提示：右下角 Toast，成功/失败都有 |
 
 ## 快速开始
 
 ```bash
 # 1. 装到桌面版 profile（带 tag 固定到本次发布）
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.3
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.4
 
 # 2. 完全退出 DSH 再重新打开（不是刷新窗口）
 
@@ -61,12 +61,12 @@ DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`�
 ### 方式一：直接从 GitHub 安装（推荐）
 
 ```bash
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.3
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.4
 ```
 
 - `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
-- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.2.3`。
-- **建议带 tag**：`#v1.2.3` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
+- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.2.4`。
+- **建议带 tag**：`#v1.2.4` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
 - pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
 
 ### 方式二：克隆到本地（开发 / 改代码）
@@ -100,7 +100,7 @@ dsh plugin --profile desktop why dsh-provider-studio
 
 ```bash
 dsh plugin --profile desktop remove dsh-provider-studio
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.3
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.4
 ```
 
 - **本地 link 安装**：`git pull` 后按需构建：
@@ -142,7 +142,7 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 
 |  |
 |:---:|
-| ![新建供应商](docs/create.png)<br>选完模板、填好密钥，直接读端点模型 |
+| ![新建供应商](docs/create.webp)<br>选完模板、填好密钥，直接读端点模型 |
 
 ### 填写 / 更换密钥
 
@@ -195,7 +195,7 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 
 |  |
 |:---:|
-| ![删除确认](docs/confirm.png)<br>删除供应商前的二次确认（清除密钥、放弃修改同理） |
+| ![删除确认](docs/confirm.webp)<br>删除供应商前的二次确认（清除密钥、放弃修改同理） |
 
 ### 导出配置
 
@@ -332,6 +332,10 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 **密钥显示为空**
 
 这个供应商的密钥来自环境变量（`$SOME_API_KEY`），凭据服务里没有真实值，插件不会伪造明文；可以在本页直接粘贴一个新密钥覆盖。
+
+**「测试」/「拉取模型」报 `PROBE_REDIRECT`**
+
+端点把请求重定向到了另一个源（比如配置的网关 302 到第三方域名）。插件只在**同一源内**跟随重定向，跨源一律拒绝，避免把 API Key（尤其是 `x-api-key`）带到别的主机；直接填最终地址即可。
 
 **官方 Models 页不见了**
 

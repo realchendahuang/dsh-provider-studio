@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.4 — 2026-11-07
+
+收口一版：安装包瘦身近一半，探针修掉三个真实缺陷，门禁里几个「永远通过」的口子改成会失败。
+
+- **详情页截图 PNG → 无损 WebP**：`docs/` 11 张 639 KB → 274 KB（像素级一致），安装包 892 KB → 542 KB；插件详情页加载的截图同步变小
+- **`client.js` 开 esbuild `minify` + UTF-8**：581 KB → 481 KB，DSH gzip 传输 246 KB → 232 KB；中文字典不再被转义成 `\uXXXX`
+- **`testModel` 响应体加上限、不再吞错**：复用 `readBodyCapped`（1 MiB）；此前 32 MiB 响应体会让 Host 进程 RSS 涨 134 MiB、200 但 body 读到一半断流仍报成功，现在返回 `PROBE_FAILED` 与「读取端点响应失败」
+- **跨源重定向加固**：探针改为手动跟随重定向且只允许同源，跨源返回新增错误码 `PROBE_REDIRECT`（undici 跨源只剥离 `authorization`，`x-api-key` 会被带到第三方）
+- **门禁补漏**：`test/` 缺失或没有 `.test.mjs` 改为 fail；`package-lock.json` 缺失改为 fail；新增 `docs/` 体积预算（320 KB）和「CI 必须跑完整门禁、不得 `--no-build`」检查；纯函数拆到 `scripts/gate-utils.mjs` 并由新增的 `test/gate.test.mjs` 覆盖
+- **文档**：README FAQ 说明 `PROBE_REDIRECT`；`index.js` 注释 ten → nine；错误码表补 `PROBE_REDIRECT` 中英文案
+
 ## 1.2.3 — 2026-11-07
 
 安装包补上 `docs/`（插件页详情里 README 截图不再 404）、安装警告说明，以及 CI 与门禁维护。

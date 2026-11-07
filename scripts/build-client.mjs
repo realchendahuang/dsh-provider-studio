@@ -36,6 +36,11 @@ const BUILD_OPTIONS = {
   target: ['es2020'],
   jsx: 'transform',
   external: ['react'],
+  // v1.2.4: client.js ships to every install and rides in the boot combo, so
+  // ship minified bytes (581 KB -> 474 KB); `charset: utf8` keeps the Chinese
+  // dictionary as UTF-8 text instead of \uXXXX escapes.
+  minify: true,
+  charset: 'utf8',
 }
 
 /** Wrap the esbuild CJS bundle in the loader factory DSH expects. */

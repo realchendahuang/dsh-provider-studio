@@ -20,6 +20,8 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
+import { installTagRefs, localImageRefs, matchesFileEntry } from './gate-utils.mjs'
+
 // ---------------------------------------------------------------- environment
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -27,12 +29,16 @@ const NO_BUILD = process.argv.includes('--no-build')
 const requireFromRoot = createRequire(join(ROOT, 'package.json'))
 
 const BUDGETS = {
-  // client.js is shipped to every install; v1.1.2 was 618,437 B with PNG logos,
-  // v1.2 moved the rasters to 48px WebP and v1.2.2 adds 35 fetched logos, so the
-  // budget keeps ~10% headroom over the current ~570 KB rather than freezing it.
-  clientBytes: 640 * 1024,
+  // client.js ships to every install and is downloaded in the boot combo. v1.2.4
+  // turned on esbuild minify (581 KB -> 474 KB); the budget keeps ~10% headroom
+  // over that rather than freezing it, so a few more logos can land first.
+  clientBytes: 540 * 1024,
   // src/client/icons.js is the generated logo table (also inlined into client.js).
   iconsBytes: 340 * 1024,
+  // docs/ ships for the installed plugin-detail page. v1.2.4 moved the
+  // screenshots from 639 KB PNG to ~270 KB lossless WebP; this budget stops a
+  // future screenshot from quietly undoing that win.
+  docsBytes: 320 * 1024,
 }
 
 const tty = process.stdout.isTTY === true
@@ -52,22 +58,6 @@ const ok = (label, detail) => rows.push({ kind: 'ok', label, detail })
 const warn = (label, detail) => rows.push({ kind: 'warn', label, detail })
 const fail = (label, detail) => rows.push({ kind: 'fail', label, detail })
 const check = (label, condition, detail) => (condition ? ok(label, detail) : fail(label, detail))
-
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-/**
- * Whether a workspace-relative file ships under one `files` entry: an exact
- * name, a directory prefix (`lib/`), or a `*`/`?` pattern (`locale/*.json`).
- * @param {string} relativePath - file path from the package root, `/`-separated.
- * @param {string} entry - one `files[]` entry as written in package.json.
- * @returns {boolean}
- */
-function matchesFileEntry(relativePath, entry) {
-  const clean = entry.replace(/^\.\//, '').replace(/\/$/, '')
-  if (!/[*?]/.test(clean)) return relativePath === clean || relativePath.startsWith(`${clean}/`)
-  const pattern = escapeRegExp(clean).replace(/\\\*/g, '.*').replace(/\\\?/g, '.')
-  return new RegExp(`^${pattern}$`, 'u').test(relativePath)
-}
 
 function printRow(row) {
   if (row.kind === 'section') {
@@ -213,7 +203,9 @@ if (existsSync(lockPath)) {
   if (lockEngines === undefined) warn('package-lock engines.dsh', 'not recorded in the lock root')
   else check('package-lock engines.dsh', lockEngines === dshRange, `${lockEngines} vs ${dshRange ?? 'missing'}`)
 } else {
-  warn('package-lock.json', 'missing — CI `npm ci` would fail')
+  // `npm ci` in CI and `npm install` by contributors both require the lock, and
+  // an unlocked repo can silently resolve a different tree per machine.
+  fail('package-lock.json', 'missing — CI `npm ci` and reproducible installs need it')
 }
 
 section('files + exports')
@@ -489,12 +481,17 @@ if (hostFiles.length === 0) {
   check('node --check host files', syntaxErrors.length === 0, syntaxErrors.length ? syntaxErrors.join(' | ') : `${hostFiles.length} file(s)`)
 }
 
-if (existsSync(join(ROOT, 'test'))) {
-  const testFiles = (await walkFiles(join(ROOT, 'test'))).filter((file) => /\.(?:m?js|cjs)$/.test(file))
-  ok('test/ present', `${testFiles.length} test file(s) — run \`npm test\``)
-} else {
-  warn('test/ present', 'missing — `npm test` has nothing to run')
-}
+// A missing or emptied suite is a gate failure, not a warning: "green" with no
+// tests is exactly the regression this gate exists to prevent.
+const testFiles = existsSync(join(ROOT, 'test'))
+  ? (await walkFiles(join(ROOT, 'test'))).filter((file) => /\.(?:m?js|cjs)$/.test(file))
+  : []
+const testCases = testFiles.filter((file) => /\.test\.m?js$/.test(file))
+check(
+  'test/ present with cases',
+  testCases.length > 0,
+  testFiles.length > 0 ? `${testFiles.length} file(s), ${testCases.length} with cases` : 'missing — `npm test` has nothing to run',
+)
 
 section('docs + notices')
 
@@ -508,9 +505,7 @@ if (existsSync(join(ROOT, 'THIRD_PARTY_NOTICES.md'))) {
 
 if (existsSync(join(ROOT, 'README.md'))) {
   const readme = await readFile(join(ROOT, 'README.md'), 'utf8')
-  const localImages = [...readme.matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)]
-    .map((match) => match[1])
-    .filter((src) => !/^[a-z]+:/i.test(src) && !src.startsWith('#'))
+  const localImages = localImageRefs(readme)
   const missingImages = localImages.filter((src) => !existsSync(join(ROOT, decodeURIComponent(src))))
   check('README local images exist', missingImages.length === 0, missingImages.length ? missingImages.join(', ') : `${localImages.length} image(s)`)
 
@@ -529,7 +524,7 @@ if (existsSync(join(ROOT, 'README.md'))) {
 
   // The install commands are the first thing a user copies; a stale tag ships
   // the wrong version even when everything else is correct.
-  const readmeTags = [...new Set([...readme.matchAll(/#v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b/g)].map((match) => match[1]))]
+  const readmeTags = installTagRefs(readme)
   check(
     'README install tag matches version',
     readmeTags.length > 0 && readmeTags.every((tag) => tag === pkg.version),
@@ -540,6 +535,34 @@ if (existsSync(join(ROOT, 'README.md'))) {
 }
 
 if (!existsSync(join(ROOT, '.gitattributes'))) warn('.gitattributes', 'missing — client.js diffs and CRLF risk on Windows')
-check('.github/workflows/check.yml', existsSync(join(ROOT, '.github/workflows/check.yml')), 'CI runs this gate')
+
+// Docs screenshots are shipped bytes: budget the whole directory, not just
+// README coverage, so a lossless-PNG relapse fails here instead of inflating
+// every install.
+const docsDir = join(ROOT, 'docs')
+if (existsSync(docsDir)) {
+  const docsFiles = await walkFiles(docsDir)
+  let docsBytes = 0
+  for (const file of docsFiles) docsBytes += (await stat(file)).size
+  check('docs/ size budget', docsBytes <= BUDGETS.docsBytes, `${kb(docsBytes)} / ${kb(BUDGETS.docsBytes)}`)
+} else {
+  warn('docs/', 'absent — the installed plugin-detail page renders its README images from here')
+}
+
+// The gate must actually run in CI, and CI must not take the --no-build shortcut:
+// that would accept a stale client.js while the workflow stays green.
+const workflowPath = join(ROOT, '.github/workflows/check.yml')
+if (existsSync(workflowPath)) {
+  const workflow = await readFile(workflowPath, 'utf8')
+  const runsGate = workflow.includes('npm run check')
+  const skipsBuild = workflow.includes('--no-build')
+  check(
+    '.github/workflows/check.yml',
+    runsGate && !skipsBuild,
+    runsGate && !skipsBuild ? 'CI runs the full gate' : skipsBuild ? 'CI passes --no-build — stale artifacts would pass' : 'CI does not run `npm run check`',
+  )
+} else {
+  fail('.github/workflows/check.yml', 'missing — CI never runs the release gate')
+}
 
 finish()

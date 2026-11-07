@@ -1,6 +1,6 @@
 {
   "name": "dsh-provider-studio",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "description": "Third-party provider manager settings page for DeepSeek Harness: browse and edit llm-pi-ai providers, API keys and models.",
   "license": "MIT",

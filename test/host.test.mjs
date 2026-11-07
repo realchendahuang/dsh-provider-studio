@@ -359,11 +359,12 @@ test('error envelope: fail/ok/toFailure/ValidationError', () => {
     'INVALID_ENUM', 'INVALID_COMPAT', 'INVALID_RETRY', 'INVALID_REASONING', 'SETTINGS_UNAVAILABLE',
     'SETTINGS_READ_ONLY', 'SETTINGS_CONFLICT', 'CREDENTIALS_UNAVAILABLE', 'CREDENTIAL_WRITE_FAILED',
     'EXPORT_EMPTY', 'EXPORT_FAILED', 'DISCOVER_EMPTY', 'DISCOVER_NOT_JSON', 'DISCOVER_HTTP',
-    'PROBE_HTTP', 'PROBE_FAILED', 'SAVE_VERIFY_FAILED']) {
+    'PROBE_HTTP', 'PROBE_REDIRECT', 'PROBE_FAILED', 'SAVE_VERIFY_FAILED']) {
     assert.ok(ERROR_CODES.includes(code), `contract code missing from taxonomy: ${code}`)
   }
-  // The frozen contract set is exactly 28 codes — no unlisted additions.
-  assert.equal(ERROR_CODES.length, 28)
+  // v1.2.4 added PROBE_REDIRECT (refused cross-origin probe redirect); the set
+  // is exactly 29 codes — no unlisted additions.
+  assert.equal(ERROR_CODES.length, 29)
 
   // `params` keys are what the Client i18n templates interpolate.
   const labelled = (fn) => {
@@ -1158,6 +1159,95 @@ test('testModel rejects a missing model id before any network work', async () =>
   const result = await service.testModel({ baseURL: 'https://x.test', apiKey: 'sk' })
   assert.equal(result.code, 'INVALID_MODEL_ID')
 })
+
+/** Run a test with a stubbed global fetch, restoring it even when the test throws. */
+async function withFetch(stub, fn) {
+  const original = globalThis.fetch
+  globalThis.fetch = stub
+  try {
+    return await fn()
+  } finally {
+    globalThis.fetch = original
+  }
+}
+
+/** A streaming 200 response whose body arrives as text chunks. */
+const streamResponse = (chunks) => ({ ok: true, status: 200, headers: { get: () => null }, ...readerResponse(chunks) })
+
+test('testModel: an oversized or broken response body fails instead of reporting ok', async () => {
+  const service = runtime({ settings: settingsStub({ sections: {} }).settings })
+  const args = { baseURL: 'https://x.test', api: 'openai-completions', apiKey: 'sk', model: 'm1' }
+
+  // The 1 MiB cap must stop the read; previously the whole body was buffered.
+  const huge = streamResponse(Array.from({ length: 6 }, () => 'x'.repeat(256 * 1024)))
+  const overflow = await withFetch(async () => huge, () => service.testModel(args))
+  assert.equal(overflow.code, 'PROBE_FAILED')
+  assert.match(overflow.detail, /exceeds/)
+
+  // A 200 whose body dies mid-read used to be swallowed into `ok: true`.
+  const broken = {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: { getReader: () => ({ read: async () => { throw new Error('socket hang up') }, cancel: async () => {} }) },
+  }
+  const unreadable = await withFetch(async () => broken, () => service.testModel(args))
+  assert.equal(unreadable.code, 'PROBE_FAILED')
+  assert.match(unreadable.detail, /socket hang up/)
+})
+
+test('probe fetch refuses a cross-origin redirect instead of forwarding x-api-key', async () => {
+  const service = runtime({ settings: settingsStub({ sections: {} }).settings })
+  const blocked = await withFetch(
+    async () => ({
+      ok: false,
+      status: 302,
+      headers: { get: (name) => (name.toLowerCase() === 'location' ? 'https://evil.test/capture' : null) },
+      body: null,
+    }),
+    () => service.testModel({ baseURL: 'https://x.test', api: 'anthropic-messages', apiKey: 'sk-ant', model: 'm1' }),
+  )
+  assert.equal(blocked.code, 'PROBE_REDIRECT')
+  assert.equal(blocked.params.to, 'https://evil.test/capture')
+  assert.match(blocked.params.from, /^https:\/\/x\.test\//)
+})
+
+test('probe fetch follows a same-origin redirect and reports the final endpoint', async () => {
+  const service = runtime({ settings: settingsStub({ sections: {} }).settings })
+  const seen = []
+  const responses = [
+    { ok: false, status: 307, headers: { get: (name) => (name.toLowerCase() === 'location' ? '/v2/messages' : null) }, body: null },
+    { ok: true, status: 200, headers: { get: () => null }, body: null, text: async () => '' },
+  ]
+  const result = await withFetch(async (url, init) => {
+    seen.push({ url, redirect: init.redirect })
+    return responses[Math.min(seen.length - 1, responses.length - 1)]
+  }, () => service.testModel({ baseURL: 'https://x.test/v1', api: 'anthropic-messages', apiKey: 'sk-ant', model: 'm1' }))
+  assert.equal(result.ok, true)
+  assert.equal(result.endpoint, 'https://x.test/v2/messages')
+  // Both hops opt out of fetch's own redirect handling so each hop is judged.
+  assert.deepEqual(seen.map((call) => call.redirect), ['manual', 'manual'])
+})
+
+test('probe HTTP failures keep only a short body snippet', async () => {
+  const service = runtime({ settings: settingsStub({ sections: {} }).settings })
+  const response = {
+    ok: false,
+    status: 401,
+    headers: { get: () => null },
+    body: readerResponse(['x'.repeat(400 * 1024), 'unauthorized']).body,
+  }
+  const result = await withFetch(async () => response, () => service.testModel({
+    baseURL: 'https://x.test',
+    api: 'openai-completions',
+    apiKey: 'sk',
+    model: 'm1',
+  }))
+  assert.equal(result.code, 'PROBE_HTTP')
+  assert.equal(result.params.status, 401)
+  assert.ok(result.detail.length <= 300, `snippet was ${result.detail.length} chars`)
+})
+
 
 // ---------------------------------------------------------------------------
 // deriveRef + describeSecret edges

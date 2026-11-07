@@ -17,7 +17,7 @@
  *   lib/validate.js    argument validators shared by both write entry points
  *   lib/errors.js      the v1.2 error envelope + stable machine codes
  *   lib/util.js        small dependency-free helpers
- *   lib/service.js     ProviderPanelRuntime — the ten RPC methods
+ *   lib/service.js     ProviderPanelRuntime — the nine RPC methods
  *
  * Design notes (learned the hard way from the settings service shapes):
  *  - reads prefer the PATCH layer (`user`) of `settings.describe()` over the
