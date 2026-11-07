@@ -6,7 +6,8 @@
  * release into a reversible half and an irreversible one:
  *
  *   node scripts/release.mjs prepare 1.2.5 --notes notes.md [--title "…"]
- *       bump package.json / package-lock / README install tags, insert the
+ *       bump package.json / package-lock and the `#vX.Y.Z` install tags in the
+ *       READMEs and docs, insert the
  *       CHANGELOG section, run the gate + tests, commit, create the annotated
  *       tag — nothing is pushed yet, so `git reset --hard HEAD~1 && git tag -d`
  *       still undoes it.
@@ -28,7 +29,7 @@
  * is the release body.
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -90,6 +91,18 @@ function parseFlags(args) {
     index += 1
   }
   return flags
+}
+
+ /** Every Markdown file whose install commands carry a `#vX.Y.Z` tag. */
+function markdownDocs() {
+  const files = [join(ROOT, 'README.md'), join(ROOT, 'README.zh.md')].filter((file) => existsSync(file))
+  const docsDir = join(ROOT, 'docs')
+  if (existsSync(docsDir)) {
+    for (const entry of readdirSync(docsDir, { recursive: true })) {
+      if (String(entry).endsWith('.md')) files.push(join(docsDir, String(entry)))
+    }
+  }
+  return files
 }
 
 function readmeTags(readme) {
@@ -165,13 +178,15 @@ function prepare(args) {
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
   run('npm', ['install', '--package-lock-only', '--ignore-scripts'])
 
-  // README install commands: every `#vX.Y.Z` must name the new tag.
-  const readmePath = join(ROOT, 'README.md')
-  const readme = readFileSync(readmePath, 'utf8')
-  const staleTags = [...new Set(readmeTags(readme))].filter((tag) => tag !== version)
-  if (staleTags.length === 0) fail(`README has no #v${current} install tag to update`)
-  const nextReadme = readme.replace(/#v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\b/g, `#v${version}`)
-  writeFileSync(readmePath, nextReadme)
+  // Install commands: every `#vX.Y.Z` in the READMEs and docs must name the new tag.
+  const markdownFiles = markdownDocs()
+  const staleTags = [...new Set(markdownFiles.flatMap((file) => readmeTags(readFileSync(file, 'utf8'))))]
+    .filter((tag) => tag !== version)
+  if (staleTags.length === 0) fail(`no #v${current} install tag to update in README.md / README.zh.md / docs`)
+  for (const file of markdownFiles) {
+    const text = readFileSync(file, 'utf8')
+    writeFileSync(file, text.replace(/#v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\b/g, `#v${version}`))
+  }
 
   runGate('gate before tagging')
 

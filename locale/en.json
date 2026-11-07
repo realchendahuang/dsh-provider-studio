@@ -1,6 +1,7 @@
 {
   "meta": {
     "title": "Provider Studio",
-    "description": "Browse and edit llm-pi-ai providers, models and API keys from Settings: reveal, copy and replace a key without touching YAML."
+    "description": "Browse and edit llm-pi-ai providers, models and API keys from Settings: reveal, copy and replace a key without touching YAML.",
+    "detail": "README.md"
   }
 }

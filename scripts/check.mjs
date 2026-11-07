@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { installTagRefs, localImageRefs, matchesFileEntry } from './gate-utils.mjs'
@@ -40,9 +40,9 @@ const BUDGETS = {
   // assets/icons/ is fetched on demand and cached immutably. v1.3.0 ships
   // ~226 KB of logos (72 SVG + 112 WebP); budget stops a raster regression.
   iconAssetsBytes: 280 * 1024,
-  // docs/ ships for the installed plugin-detail page. v1.2.4 moved the
-  // screenshots from 639 KB PNG to ~270 KB lossless WebP; this budget stops a
-  // future screenshot from quietly undoing that win.
+  // docs/ screenshots ship for the installed plugin-detail page. v1.2.4 moved
+  // them from 639 KB PNG to ~270 KB lossless WebP; this budget counts images
+  // only and stops a future screenshot from quietly undoing that win.
   docsBytes: 320 * 1024,
 }
 
@@ -313,15 +313,31 @@ if (!existsSync(localeDir)) {
   const localeFiles = (await readdir(localeDir)).filter((name) => name.endsWith('.json')).sort()
   check('locale/en.json', localeFiles.includes('en.json'), 'DSH readPluginMeta 以它作为语言基准')
   const metaKeys = new Map()
+  const detailTargets = []
   for (const name of localeFiles) {
     const parsed = (await readJson(join(localeDir, name), `locale/${name}`)).value
     if (!parsed) continue
     const title = parsed.meta?.title
     check(`locale/${name} meta.title`, typeof title === 'string' && title.trim() !== '', typeof title === 'string' ? title : 'missing')
     metaKeys.set(name, Object.keys(parsed.meta ?? {}).sort().join(','))
+    if (typeof parsed.meta?.detail === 'string') detailTargets.push({ name, detail: parsed.meta.detail })
   }
   const shapes = new Set(metaKeys.values())
   if (shapes.size > 1) warn('locale meta keys', `differ between files: ${[...metaKeys].map(([name, keys]) => `${name}{${keys}}`).join(' ')}`)
+  // `meta.detail` names the Markdown the installed plugin page renders; a file
+  // that is missing or left out of `files[]` makes that page show an error
+  // instead of the document.
+  const brokenDetails = detailTargets.filter(({ detail }) => {
+    const target = join(ROOT, detail)
+    return !existsSync(target) || !filesEntries.some((entry) => matchesFileEntry(detail, entry))
+  })
+  check(
+    'locale meta.detail ships',
+    brokenDetails.length === 0,
+    brokenDetails.length
+      ? brokenDetails.map(({ name, detail }) => `locale/${name} → ${detail}`).join(', ')
+      : detailTargets.map(({ detail }) => detail).join(', ') || 'none declared',
+  )
 }
 
 const iconSvg = join(ROOT, 'icon.svg')
@@ -578,48 +594,94 @@ if (existsSync(join(ROOT, 'THIRD_PARTY_NOTICES.md'))) {
   fail('THIRD_PARTY_NOTICES.md', 'missing — upstream MIT/ISC assets must ship their notices')
 }
 
-if (existsSync(join(ROOT, 'README.md'))) {
-  const readme = await readFile(join(ROOT, 'README.md'), 'utf8')
-  const localImages = localImageRefs(readme)
-  const missingImages = localImages.filter((src) => !existsSync(join(ROOT, decodeURIComponent(src))))
-  check('README local images exist', missingImages.length === 0, missingImages.length ? missingImages.join(', ') : `${localImages.length} image(s)`)
+// Both READMEs and every docs page ship inside the package, and the installed
+// plugin page renders them. A local image must exist next to the markdown that
+// references it, a `files` whitelist that drops `docs/` would 404 every
+// screenshot, an install tag must name the current version, and the Chinese
+// mirror must not drift away from the English tree.
+const readmePath = join(ROOT, 'README.md')
+const readmeZhPath = join(ROOT, 'README.zh.md')
+const docsDir = join(ROOT, 'docs')
+if (!existsSync(readmePath)) fail('README.md', 'missing — that is the repository and package page')
+if (!existsSync(readmeZhPath)) fail('README.zh.md', 'missing — README.md must ship a Chinese translation')
+const readmeText = existsSync(readmePath) ? await readFile(readmePath, 'utf8') : ''
+const readmeZhText = existsSync(readmeZhPath) ? await readFile(readmeZhPath, 'utf8') : ''
+check(
+  'README language switcher',
+  readmeText.includes('README.zh.md') && readmeZhText.includes('README.md'),
+  'README.md ↔ README.zh.md',
+)
 
-  // A relative README image only renders from an install when the file ships.
-  // The Plugins page renders the installed package's README through
-  // `dsh-plugin-detail`, which resolves images beside that README, so a
-  // `files` whitelist that drops `docs/` turns every screenshot into a 404.
-  const unshippedImages = localImages
-    .map((src) => decodeURIComponent(src))
-    .filter((src) => !filesEntries.some((entry) => matchesFileEntry(src, entry)))
-  check(
-    'README images ship in files[]',
-    unshippedImages.length === 0,
-    unshippedImages.length ? `${unshippedImages.join(', ')} — add their directory to files[]` : `${localImages.length} image(s) covered`,
-  )
+const markdownFiles = [readmePath, readmeZhPath].filter((path) => existsSync(path))
+const docsPages = existsSync(docsDir) ? (await walkFiles(docsDir)).filter((file) => file.endsWith('.md')) : []
+markdownFiles.push(...docsPages)
 
-  // The install commands are the first thing a user copies; a stale tag ships
-  // the wrong version even when everything else is correct.
-  const readmeTags = installTagRefs(readme)
-  check(
-    'README install tag matches version',
-    readmeTags.length > 0 && readmeTags.every((tag) => tag === pkg.version),
-    readmeTags.length ? `${readmeTags.join(', ')} vs ${pkg.version}` : 'no #vX.Y.Z install tag found in README',
-  )
-} else {
-  fail('README.md', 'missing')
+const missingImages = []
+const unshippedImages = []
+const staleTags = []
+let tagCount = 0
+for (const file of markdownFiles) {
+  const text = await readFile(file, 'utf8')
+  for (const src of localImageRefs(text).map((entry) => decodeURIComponent(entry))) {
+    const target = resolve(dirname(file), src)
+    if (!existsSync(target)) {
+      missingImages.push(`${rel(file)} → ${src}`)
+      continue
+    }
+    // `dsh-plugin-detail` resolves README images beside the installed README,
+    // so the file also has to ship under `files[]`.
+    const shipped = rel(target)
+    if (!filesEntries.some((entry) => matchesFileEntry(shipped, entry))) unshippedImages.push(`${rel(file)} → ${src}`)
+  }
+  for (const tag of installTagRefs(text)) {
+    tagCount += 1
+    if (tag !== pkg.version) staleTags.push(`${rel(file)} → v${tag}`)
+  }
 }
+check(
+  'docs images exist',
+  missingImages.length === 0,
+  missingImages.length ? missingImages.slice(0, 5).join(', ') : `${markdownFiles.length} markdown files`,
+)
+check(
+  'docs images ship in files[]',
+  unshippedImages.length === 0,
+  unshippedImages.length ? unshippedImages.slice(0, 5).join(', ') : `${markdownFiles.length} markdown files covered`,
+)
+// The install commands are the first thing a user copies; a stale tag ships the
+// wrong version even when everything else is correct.
+check(
+  'install tags match version',
+  tagCount > 0 && staleTags.length === 0,
+  staleTags.length ? `${staleTags.slice(0, 5).join(', ')} vs ${pkg.version}` : `${tagCount} ref(s) at v${pkg.version}`,
+)
+
+// Every page must exist in both languages: the repo ships README.md (English)
+// plus README.zh.md, and docs/<page>.md plus docs/zh/<page>.md.
+const missingMirrors = []
+for (const file of docsPages) {
+  const fromDocs = relative(docsDir, file)
+  const counterpart = fromDocs.startsWith('zh/') ? join(docsDir, fromDocs.slice(3)) : join(docsDir, 'zh', fromDocs)
+  if (!existsSync(counterpart)) missingMirrors.push(`docs/${fromDocs}`)
+}
+check(
+  'docs translations mirrored',
+  missingMirrors.length === 0,
+  missingMirrors.length ? `missing Chinese/English pair: ${missingMirrors.join(', ')}` : `${docsPages.length} doc pages`,
+)
 
 if (!existsSync(join(ROOT, '.gitattributes'))) warn('.gitattributes', 'missing — client.js diffs and CRLF risk on Windows')
 
-// Docs screenshots are shipped bytes: budget the whole directory, not just
-// README coverage, so a lossless-PNG relapse fails here instead of inflating
-// every install.
-const docsDir = join(ROOT, 'docs')
+// Docs screenshots are the bytes that cost every install: budget them, so a
+// lossless-PNG relapse fails here instead of inflating the package. Markdown
+// pages are cheap and do not count.
 if (existsSync(docsDir)) {
   const docsFiles = await walkFiles(docsDir)
-  let docsBytes = 0
-  for (const file of docsFiles) docsBytes += (await stat(file)).size
-  check('docs/ size budget', docsBytes <= BUDGETS.docsBytes, `${kb(docsBytes)} / ${kb(BUDGETS.docsBytes)}`)
+  let imageBytes = 0
+  for (const file of docsFiles) {
+    if (/\.(?:webp|png|jpe?g|gif|svg)$/i.test(file)) imageBytes += (await stat(file)).size
+  }
+  check('docs/ image budget', imageBytes <= BUDGETS.docsBytes, `${kb(imageBytes)} / ${kb(BUDGETS.docsBytes)}`)
 } else {
   warn('docs/', 'absent — the installed plugin-detail page renders its README images from here')
 }

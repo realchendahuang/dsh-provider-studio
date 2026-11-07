@@ -1,6 +1,7 @@
 {
   "meta": {
     "title": "供应商管理",
-    "description": "在设置里查看与编辑 llm-pi-ai 的供应商、模型与 API 密钥：密钥可显示、可复制、可直接更换。"
+    "description": "在设置里查看与编辑 llm-pi-ai 的供应商、模型与 API 密钥：密钥可显示、可复制、可直接更换。",
+    "detail": "README.zh.md"
   }
 }
