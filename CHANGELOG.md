@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.3 — 2026-11-07
+
+安装包补上 `docs/`（插件页详情里 README 截图不再 404）、安装警告说明，以及 CI 与门禁维护。
+
+- **`files` 补 `docs/`**：DSH 插件页的已安装详情由 `dsh-plugin-detail` 读取**包内** README，相对截图按包目录解析；`docs/` 不随包发布时详情页会整片图裂。官方组合包同样把 `docs` 放进 `files`
+- **门禁加两条**：README 里的本地图片必须落在 `files` 白名单内；README 安装命令的 `#vX.Y.Z` 必须等于 `package.json` 版本（v1.2.1 / v1.2.2 的 tag 引用过期就是没有这条检查）
+- **README**：FAQ 补 pnpm `missing peer @deepseek-ai/cordis` 警告说明（cordis 由 DSH 本体提供，可忽略）；开发文件表补 `docs/`
+- **CI**：`actions/checkout`、`actions/setup-node` 从 v4 升到 v7（v4 已触发 Node 20 弃用提示，v7 仍支持 `node-version: 22` 与 `cache: npm`）
+
 ## 1.2.2 — 2026-11-06
 
 补齐供应商 logo：把没有图标的模板按官网逐个找了一遍，新增 35 个真实品牌标；顺带为 Magpie 这类本地网关加上了官网图标。

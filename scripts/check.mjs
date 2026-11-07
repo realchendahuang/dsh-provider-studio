@@ -53,6 +53,22 @@ const warn = (label, detail) => rows.push({ kind: 'warn', label, detail })
 const fail = (label, detail) => rows.push({ kind: 'fail', label, detail })
 const check = (label, condition, detail) => (condition ? ok(label, detail) : fail(label, detail))
 
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Whether a workspace-relative file ships under one `files` entry: an exact
+ * name, a directory prefix (`lib/`), or a `*`/`?` pattern (`locale/*.json`).
+ * @param {string} relativePath - file path from the package root, `/`-separated.
+ * @param {string} entry - one `files[]` entry as written in package.json.
+ * @returns {boolean}
+ */
+function matchesFileEntry(relativePath, entry) {
+  const clean = entry.replace(/^\.\//, '').replace(/\/$/, '')
+  if (!/[*?]/.test(clean)) return relativePath === clean || relativePath.startsWith(`${clean}/`)
+  const pattern = escapeRegExp(clean).replace(/\\\*/g, '.*').replace(/\\\?/g, '.')
+  return new RegExp(`^${pattern}$`, 'u').test(relativePath)
+}
+
 function printRow(row) {
   if (row.kind === 'section') {
     console.log(`\n${bold(row.title)}`)
@@ -497,6 +513,28 @@ if (existsSync(join(ROOT, 'README.md'))) {
     .filter((src) => !/^[a-z]+:/i.test(src) && !src.startsWith('#'))
   const missingImages = localImages.filter((src) => !existsSync(join(ROOT, decodeURIComponent(src))))
   check('README local images exist', missingImages.length === 0, missingImages.length ? missingImages.join(', ') : `${localImages.length} image(s)`)
+
+  // A relative README image only renders from an install when the file ships.
+  // The Plugins page renders the installed package's README through
+  // `dsh-plugin-detail`, which resolves images beside that README, so a
+  // `files` whitelist that drops `docs/` turns every screenshot into a 404.
+  const unshippedImages = localImages
+    .map((src) => decodeURIComponent(src))
+    .filter((src) => !filesEntries.some((entry) => matchesFileEntry(src, entry)))
+  check(
+    'README images ship in files[]',
+    unshippedImages.length === 0,
+    unshippedImages.length ? `${unshippedImages.join(', ')} — add their directory to files[]` : `${localImages.length} image(s) covered`,
+  )
+
+  // The install commands are the first thing a user copies; a stale tag ships
+  // the wrong version even when everything else is correct.
+  const readmeTags = [...new Set([...readme.matchAll(/#v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b/g)].map((match) => match[1]))]
+  check(
+    'README install tag matches version',
+    readmeTags.length > 0 && readmeTags.every((tag) => tag === pkg.version),
+    readmeTags.length ? `${readmeTags.join(', ')} vs ${pkg.version}` : 'no #vX.Y.Z install tag found in README',
+  )
 } else {
   fail('README.md', 'missing')
 }

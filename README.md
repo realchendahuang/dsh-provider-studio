@@ -43,7 +43,7 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 
 ```bash
 # 1. 装到桌面版 profile（带 tag 固定到本次发布）
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.2
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.3
 
 # 2. 完全退出 DSH 再重新打开（不是刷新窗口）
 
@@ -61,12 +61,12 @@ DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`�
 ### 方式一：直接从 GitHub 安装（推荐）
 
 ```bash
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.2
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.3
 ```
 
 - `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
-- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.2.2`。
-- **建议带 tag**：`#v1.2.2` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
+- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.2.3`。
+- **建议带 tag**：`#v1.2.3` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
 - pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
 
 ### 方式二：克隆到本地（开发 / 改代码）
@@ -100,7 +100,7 @@ dsh plugin --profile desktop why dsh-provider-studio
 
 ```bash
 dsh plugin --profile desktop remove dsh-provider-studio
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.2
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.3
 ```
 
 - **本地 link 安装**：`git pull` 后按需构建：
@@ -337,6 +337,10 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 
 预期行为，见「与官方 Models 设置页的关系」。改 `cordis.patch.yml` 一行即可恢复。
 
+**安装时打印 `[WARN] Issues with peer dependencies found` / `missing peer @deepseek-ai/cordis`**
+
+无害，可以忽略。`@deepseek-ai/cordis` 是 DSH 本体提供的运行时框架，不在 profile 的 `node_modules` 里，pnpm 因此看不到它；DSH 启动时会从安装体解析同一份 cordis，插件和 DSH 自带组合包都是这么工作的。安装本身会正常完成（`+ dsh-provider-studio 1.2.3`）。
+
 ## 已知限制
 
 - Host 端改动必须重启 DSH 才生效（见「安装」）。
@@ -368,6 +372,7 @@ src/client/         浏览器端源码（JSX）：views/ 页面、components/ UI
 client.js           浏览器端构建产物，随仓库提交（安装时直接加载）
 cordis.patch.yml    bundle patch：插入本插件 + 隐藏官方 Models 页
 icons/              品牌 logo 源文件（72 SVG + 112 个 48px WebP；构建期内联，不随包发布）
+docs/               README 截图（随包发布：插件页的已安装详情会按包内 README 渲染这些图片）
 locale/             设置分区标题/描述的本地化
 test/               Host 纯函数单测（node:test）
 scripts/            构建、图标生成与发布门禁脚本
