@@ -1,0 +1,39 @@
+name: tag guard
+
+# A tag that reaches GitHub is immutable, so verify it before it can be used as
+# an install ref: annotated, equal to package.json, and on main.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: tag is releaseable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify annotated tag, version and branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [ "$(git cat-file -t "refs/tags/$tag")" != "tag" ]; then
+            echo "::error::$tag is a lightweight tag; releases use annotated tags"
+            exit 1
+          fi
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::$tag does not match package.json version $version"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$(git rev-list -n1 "$tag")" origin/main; then
+            echo "::error::the commit behind $tag is not on main"
+            exit 1
+          fi
+          echo "ok: $tag is annotated, matches $version and is on main"

@@ -1,6 +1,6 @@
 {
   "name": "dsh-provider-studio",
-  "version": "1.2.4",
+  "version": "1.3.0",
   "private": true,
   "description": "Third-party provider manager settings page for DeepSeek Harness: browse and edit llm-pi-ai providers, API keys and models.",
   "license": "MIT",
@@ -17,7 +17,7 @@
     "cordis"
   ],
   "engines": {
-    "dsh": ">=0.2.1-rc.5 <0.3.0-0"
+    "dsh": ">=0.2.2-rc.1 <0.3.0-0"
   },
   "type": "module",
   "exports": {
@@ -25,7 +25,8 @@
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./assets/*": "./assets/*"
   },
   "files": [
     "index.js",
@@ -36,7 +37,8 @@
     "locale/*.json",
     "icon.svg",
     "docs/",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "assets/"
   ],
   "dsh": {
     "bundle": {
@@ -67,7 +69,8 @@
     "build:client": "node scripts/build-client.mjs",
     "check": "node scripts/check.mjs",
     "test": "node --test test/",
-    "gen:icons": "node scripts/gen-icons.mjs"
+    "gen:icons": "node scripts/gen-icons.mjs",
+    "test:coverage": "node scripts/coverage.mjs"
   },
   "dependencies": {
     "@deepseek-ai/dsh-typert-protocol": "^0.2.1-rc.5 || ^0.2.2-rc.1",

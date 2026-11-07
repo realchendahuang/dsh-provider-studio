@@ -14,6 +14,7 @@
  * Exits 1 when any check fails; warnings do not fail the build.
  */
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
@@ -29,12 +30,16 @@ const NO_BUILD = process.argv.includes('--no-build')
 const requireFromRoot = createRequire(join(ROOT, 'package.json'))
 
 const BUDGETS = {
-  // client.js ships to every install and is downloaded in the boot combo. v1.2.4
-  // turned on esbuild minify (581 KB -> 474 KB); the budget keeps ~10% headroom
-  // over that rather than freezing it, so a few more logos can land first.
-  clientBytes: 540 * 1024,
-  // src/client/icons.js is the generated logo table (also inlined into client.js).
-  iconsBytes: 340 * 1024,
+  // client.js ships to every install and is downloaded in the boot combo.
+  // v1.3.0 moved the logos to package assets, so the bundle is ~196 KB; the
+  // budget keeps ~20% headroom for ordinary code growth.
+  clientBytes: 240 * 1024,
+  // src/client/icons.js is now only the key -> asset map (~23 KB); anything
+  // near the old 340 KB budget means someone re-inlined the logos.
+  iconsBytes: 48 * 1024,
+  // assets/icons/ is fetched on demand and cached immutably. v1.3.0 ships
+  // ~226 KB of logos (72 SVG + 112 WebP); budget stops a raster regression.
+  iconAssetsBytes: 280 * 1024,
   // docs/ ships for the installed plugin-detail page. v1.2.4 moved the
   // screenshots from 639 KB PNG to ~270 KB lossless WebP; this budget stops a
   // future screenshot from quietly undoing that win.
@@ -166,7 +171,7 @@ check(
   !Object.hasOwn(pkg.scripts ?? {}, 'prepare'),
   Object.hasOwn(pkg.scripts ?? {}, 'prepare') ? 'git installs would need build approval' : 'install stays build-free',
 )
-for (const script of ['build:client', 'check', 'test', 'gen:icons']) {
+for (const script of ['build:client', 'check', 'test', 'test:coverage', 'gen:icons']) {
   check(`scripts.${script}`, typeof pkg.scripts?.[script] === 'string', pkg.scripts?.[script] ?? 'missing')
 }
 
@@ -396,11 +401,72 @@ if (Array.isArray(templatesModule.value) && iconKeys.length > 0) {
     ok('no unreferenced icons', `${iconKeys.length} icons, all used`)
   }
 
-  const nonDataUris = iconKeys.filter((key) => typeof iconMap[key] !== 'string' || !iconMap[key].startsWith('data:image/'))
-  check('icons are data URLs', nonDataUris.length === 0, nonDataUris.slice(0, 5).join(', ') || `${iconKeys.length} data URLs`)
-  const pngIcons = iconKeys.filter((key) => typeof iconMap[key] === 'string' && iconMap[key].startsWith('data:image/png'))
-  check('logos are WebP/SVG (no PNG)', pngIcons.length === 0,
-    pngIcons.length === 0 ? 'v1.2 keeps rasters as 48px WebP' : `${pngIcons.length} PNG data URL(s): ${pngIcons.slice(0, 5).join(', ')} — run scripts/gen-icons.mjs on WebP sources`)
+  // v1.3.0: logos are package assets served by the `/plugins` asset route, not
+  // data URLs in the bundle. The map therefore holds content-addressed
+  // references, and every reference must resolve to a shipped file whose SHA-1
+  // prefix matches the name (the route caches `immutable`).
+  const ASSET_PREFIX = `plugins/${pkg.name}/assets/icons/`
+  const refs = iconKeys.map((key) => ({ key, ref: typeof iconMap[key] === 'string' ? iconMap[key].replace(/^\//, '') : null }))
+  const notAssets = refs.filter(({ ref }) => ref === null || !ref.startsWith(ASSET_PREFIX))
+  check(
+    'icons are packaged assets',
+    notAssets.length === 0,
+    notAssets.length
+      ? `${notAssets.slice(0, 5).map(({ key }) => key).join(', ')} — run scripts/gen-icons.mjs`
+      : `${iconKeys.length} asset references`,
+  )
+
+  const assetsDir = join(ROOT, 'assets/icons')
+  const brokenAssets = []
+  const shippedExtensions = new Set()
+  for (const { key, ref } of refs) {
+    if (ref === null || !ref.startsWith(ASSET_PREFIX)) continue
+    const file = ref.slice(ASSET_PREFIX.length)
+    const target = join(assetsDir, file)
+    if (!existsSync(target)) {
+      brokenAssets.push(`${key}: ${file} missing`)
+      continue
+    }
+    const hash = file.match(/\.([0-9a-f]{12})\.(svg|webp|png)$/)?.[1]
+    if (hash === undefined) {
+      brokenAssets.push(`${key}: ${file} is not content-addressed`)
+      continue
+    }
+    const digest = createHash('sha1').update(await readFile(target)).digest('hex').slice(0, 12)
+    if (digest !== hash) brokenAssets.push(`${key}: ${file} hash mismatch (${digest})`)
+    shippedExtensions.add(file.slice(file.lastIndexOf('.') + 1))
+  }
+  check(
+    'icon assets exist and are content-addressed',
+    brokenAssets.length === 0,
+    brokenAssets.slice(0, 5).join(' | ') || `${refs.length} files in assets/icons/`,
+  )
+  check(
+    'logos are WebP/SVG (no PNG)',
+    !shippedExtensions.has('png'),
+    shippedExtensions.has('png') ? 'PNG asset shipped — run scripts/gen-icons.mjs on WebP sources' : [...shippedExtensions].sort().join(' / '),
+  )
+  if (existsSync(assetsDir)) {
+    const assetFiles = await walkFiles(assetsDir)
+    let assetsBytes = 0
+    for (const file of assetFiles) assetsBytes += (await stat(file)).size
+    check(
+      'assets/icons/ size budget',
+      assetsBytes <= BUDGETS.iconAssetsBytes,
+      `${kb(assetsBytes)} / ${kb(BUDGETS.iconAssetsBytes)}`,
+    )
+    const referencedNames = new Set(refs.map(({ ref }) => (ref === null ? '' : ref.slice(ASSET_PREFIX.length))))
+    const stray = assetFiles
+      .map((file) => rel(file).replace(/^assets\/icons\//, ''))
+      .filter((name) => !referencedNames.has(name))
+    check(
+      'no stray icon assets',
+      stray.length === 0,
+      stray.length ? `${stray.slice(0, 5).join(', ')} — run scripts/gen-icons.mjs` : `${assetFiles.length} files`,
+    )
+  } else {
+    fail('assets/icons/', 'missing — run scripts/gen-icons.mjs')
+  }
 }
 
 section('client artifact')

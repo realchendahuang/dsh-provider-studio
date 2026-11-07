@@ -2,6 +2,7 @@
 
 [![DSH](https://img.shields.io/badge/DSH-0.2.x-0f1115)](#安装)
 [![Version](https://img.shields.io/github/package-json/v/realchendahuang/dsh-provider-studio?label=version)](https://github.com/realchendahuang/dsh-provider-studio/releases)
+[![check](https://github.com/realchendahuang/dsh-provider-studio/actions/workflows/check.yml/badge.svg)](https://github.com/realchendahuang/dsh-provider-studio/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/realchendahuang/dsh-provider-studio)](https://github.com/realchendahuang/dsh-provider-studio/commits/main)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/realchendahuang/dsh-provider-studio)](https://github.com/realchendahuang/dsh-provider-studio/graphs/commit-activity)
@@ -43,7 +44,7 @@ DSH（DeepSeek Harness）自带的 Models 设置页只认 schema 投影后的字
 
 ```bash
 # 1. 装到桌面版 profile（带 tag 固定到本次发布）
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.4
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.0
 
 # 2. 完全退出 DSH 再重新打开（不是刷新窗口）
 
@@ -54,19 +55,19 @@ dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2
 
 ## 安装
 
-前置：DSH 桌面版 0.2.x（`engines.dsh` 锁在 `>=0.2.1-rc.5 <0.3.0-0`，按 `0.2.1-rc.5` 与 `0.2.2-rc.1` 实测；DSH 0.3 发布后需要插件先适配）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
+前置：DSH 桌面版 0.2.x（`engines.dsh` 锁在 `>=0.2.2-rc.1 <0.3.0-0`，按 `0.2.2-rc.1` 实测；logo 走 `/plugins` 资源路由，0.2.1 及更早版本没有这条路由；DSH 0.3 发布后需要插件先适配）；`dsh` CLI 已在 PATH 中。仓库里已带有构建好的 `client.js`，**安装不需要先构建**。
 
 DSH 按 **profile** 隔离插件：桌面版用 `desktop`，`dsh web` 用 `web`，所以命令里的 `--profile` 要和你实际启动的那个一致。
 
 ### 方式一：直接从 GitHub 安装（推荐）
 
 ```bash
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.4
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.0
 ```
 
 - `<profile>` 换成你的 DSH profile（`desktop`、`web` 等）。
-- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.2.4`。
-- **建议带 tag**：`#v1.2.4` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
+- 也可以写成完整地址：`git+https://github.com/realchendahuang/dsh-provider-studio.git#v1.3.0`。
+- **建议带 tag**：`#v1.3.0` 固定到本次发布；想锁定到某个提交就写 `#<commit-sha>`。不带 ref 会跟随 `main` 最新提交，可能拿到未发布的改动。
 - pnpm 会把仓库拉进 profile 的 `node_modules`，并按 `package.json` 安装运行依赖（`yaml`、`@deepseek-ai/dsh-typert-protocol`）。插件没有 `prepare` / 安装时构建脚本，安装过程不会编译任何东西。
 
 ### 方式二：克隆到本地（开发 / 改代码）
@@ -100,7 +101,7 @@ dsh plugin --profile desktop why dsh-provider-studio
 
 ```bash
 dsh plugin --profile desktop remove dsh-provider-studio
-dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.2.4
+dsh plugin --profile desktop add github:realchendahuang/dsh-provider-studio#v1.3.0
 ```
 
 - **本地 link 安装**：`git pull` 后按需构建：
@@ -282,7 +283,7 @@ dsh plugin --profile <profile> remove dsh-provider-studio
 - 其中 45 个精选条目带中文名并分组（常用 / 国内厂商 / 海外厂商 / 网关），其余 173 个在「更多供应商」组；每组默认显示 12 个、可展开，顶部搜索框可检索全部条目。
 - 模板只预填显示名 / 路由 ID / 协议 / Base URL；模型不预填——点「读取模型」按账户实际可用的型号现取。
 - Anthropic 协议的模板给的是**根地址**（如 `https://api.anthropic.com`），`/v1/messages` 由客户端补，所以不要在 Base URL 末尾再加 `/v1`。
-- 品牌 logo：构建期内联 184 个 logo（72 个 SVG + 112 个 48×48 WebP，来源见「数据来源与致谢」），218 个模板中 201 个直接带图标、1 个按关键词规则匹配，其余 16 个显示首字母占位。
+- 品牌 logo：随包发布 184 个 logo（72 个 SVG + 112 个 48×48 WebP，来源见「数据来源与致谢」），由 `/plugins/dsh-provider-studio/assets/` 按需加载（不进 `client.js`）；218 个模板中 201 个直接带图标、1 个按关键词规则匹配，其余 16 个显示首字母占位。
 - 需要专用 SDK 的厂商（Google、Bedrock、Azure 等）不收录，因为 DSH 的 `llm-pi-ai` 只支持上面三种协议。
 - 「常用」分组里还带一个「自定义供应商」入口，用于任意 OpenAI 兼容端点。
 
@@ -356,7 +357,7 @@ Host 端还是旧进程，重启 DSH 即可。界面里也会给这条提示。
 - 「复制配置」只导出单个供应商、且不含密钥；整份 profile 的配置仍以 `cordis.patch.yml` 为准。
 - 密钥显示 / 复制由 Host 的 `revealKey({ route })` 按需读取：只有点击时才去凭据服务取明文，`getProvider` 不再随详情返回密钥；读不到时显示空值，不会伪造明文。
 - Host 失败统一带稳定错误码（`{ ok: false, code, ... }`），界面按 `err.<CODE>` 显示中英文案；排障时优先搜错误码（例如 `PROBE_HTTP`、`SETTINGS_CONFLICT`）。
-- 按 DSH `0.2.1-rc.5` / `0.2.2-rc.1` 实测，`engines.dsh` 限定为 `>=0.2.1-rc.5 <0.3.0-0`；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 0.3 发布后需要先发一版适配（会主动放宽上界，不会被静默放行）。
+- 按 DSH `0.2.2-rc.1` 实测，`engines.dsh` 限定为 `>=0.2.2-rc.1 <0.3.0-0`（v1.3.0 的 logo 资源路由从 0.2.2 起才有）；插件依赖 DSH 内部的 settings / credentials / Typert Remote 形态，DSH 0.3 发布后需要先发一版适配（会主动放宽上界，不会被静默放行）。
 
 ## 数据来源与致谢
 
@@ -375,7 +376,8 @@ contract.js         Host ↔ Client 契约：服务名、方法表、Typert 描�
 src/client/         浏览器端源码（JSX）：views/ 页面、components/ UI 原语、hooks.js、templates/ 模板数据
 client.js           浏览器端构建产物，随仓库提交（安装时直接加载）
 cordis.patch.yml    bundle patch：插入本插件 + 隐藏官方 Models 页
-icons/              品牌 logo 源文件（72 SVG + 112 个 48px WebP；构建期内联，不随包发布）
+icons/              品牌 logo 源文件（72 SVG + 112 个 48px WebP；构建期素材，不随包发布）
+assets/icons/       随包发布的 logo（内容哈希命名，由 /plugins 资源路由按需加载）
 docs/               README 截图（随包发布：插件页的已安装详情会按包内 README 渲染这些图片）
 locale/             设置分区标题/描述的本地化
 test/               Host 纯函数单测（node:test）
@@ -384,20 +386,31 @@ scripts/            构建、图标生成与发布门禁脚本
 
 ```bash
 npm ci                        # 按 package-lock 安装（首次 / CI；改依赖时用 npm install）
-npm run check                 # 发布门禁：版本、files、patch、图标、client.js 一致性、体积预算
+npm run check                 # 发布门禁：版本、files、patch、图标资源、client.js 一致性、体积预算
 npm test                      # Host 单测（node:test）
+npm run test:coverage         # 单测 + 覆盖率门禁（行 87 / 分支 82 / 函数 91）
 npm run build:client          # src/client/ → dist/client.bundle.cjs → client.js
-npm run gen:icons             # icons/ → src/client/icons.js（内联 data URL）
+npm run gen:icons             # icons/ → assets/icons/（内容哈希）+ src/client/icons.js（key → 资源引用）
 node scripts/gen-ui-icons.mjs # Lucide 字形 → src/client/ui-icons.jsx
 python3 scripts/fetch-favicons.py  # 为缺 logo 的模板抓官网 favicon（需 Pillow）
 ```
 
+发布走两段式脚本（tag 推到远端后不可重打，所以 `prepare` 只做本地可回退的部分）：
+
+```bash
+node scripts/release.mjs prepare 1.3.1 --title "一句话标题" --notes /tmp/notes.md
+# 检查 git show --stat HEAD 与 tag 后：
+node scripts/release.mjs publish
+```
+
+`prepare` 会校验版本递增与工作区干净、插入 CHANGELOG、同步 `package.json` / `package-lock` / README 的 `#vX.Y.Z`、跑门禁、commit 并打 annotated tag；`publish` 在确认远端没有同名 tag、门禁重跑通过后原子推送 `main` 与 tag，等 CI 绿再用 CHANGELOG 段落建 GitHub Release。
+
 - `client.js` 由 `scripts/build-client.mjs` 用 esbuild 打成 CJS，再包进 `window.__ModuleLoader__.load` 的 factory；React 由 DSH 的模块表提供，不打进 bundle。Node 22 + esbuild 0.25（`package-lock` 锁定）可复现，构建失败不会留下半个 `client.js`（临时文件 + rename）。
-- `scripts/check.mjs` 不写盘：它调用 `build-client.mjs` 暴露的同一套 esbuild 配置在内存里重建 `client.js`，与提交产物逐字节比对；版本、`engines.dsh` 上界、`files` 白名单、`cordis.patch.yml`、模板↔图标孤儿、`node --check`、体积预算也都在这一步。`--no-build` 可跳过重建比对（例如没装 `node_modules`）。CI（`.github/workflows/check.yml`）跑 `npm ci` → `npm run check` → `npm test`。
+- `scripts/check.mjs` 不写盘：它调用 `build-client.mjs` 暴露的同一套 esbuild 配置在内存里重建 `client.js`，与提交产物逐字节比对；版本、`engines.dsh` 上界、`files` 白名单、`cordis.patch.yml`、模板↔图标孤儿、logo 资源存在与内容哈希、`node --check`、体积预算（client / icons / assets / docs）也都在这一步。`--no-build` 可跳过重建比对（例如没装 `node_modules`），CI 里不允许用它。CI（`.github/workflows/check.yml`）跑 `npm ci` → `npm run check` → `npm test`。
 - `src/client/icons.js`、`src/client/ui-icons.jsx`、`dist/` 都是生成物，不要手改；`client.js` 是例外——它是需要提交的发布产物。
 - 新增供应商 logo：优先放官方站点的苹果触控图标 / SVG，再跑 `python3 scripts/fetch-favicons.py`（会自动跳过本地与内网地址、裁掉透明留白）；缺图标的模板会回退到首字母。
 - 图标换过格式后要先跑测量：`python3 scripts/icon-frames.py`（透明留白 → 光学缩放）和 `python3 scripts/icon-tones.py`（明暗分类 → 浅/深底板），再 `node scripts/gen-icons.mjs`；两个 Python 脚本需要 Pillow。
-- 图标策略：`icons/` 是构建期素材，不是运行时资源。`gen-icons.mjs` 把 SVG 与 48×48 WebP 内联成 `src/client/icons.js` 的 data URL，再被 esbuild 打进 `client.js`；`files` 白名单里没有 `icons/`。PNG 已统一转成 WebP（原 PNG 见 git 历史），新增 favicon 要先转 48px WebP 再跑 `npm run gen:icons`。
+- 图标策略：`icons/` 仍是构建期素材，但不再内联进 bundle。`gen-icons.mjs` 把每个 logo 复制成 `assets/icons/<key>.<sha1-12>.<ext>`（内容哈希命名，资源路由对它们返回 `immutable` 缓存），并生成只含 key → `require.asset("plugins/<包名>/assets/icons/<file>")` 的 `src/client/icons.js`。`package.json` 的 `"./assets/*": "./assets/*"` 导出是资源路由解析文件的前提，`files` 白名单同时包含 `assets/`；`icons/` 本身不随包发布。PNG 已统一转成 WebP（原 PNG 见 git 历史），新增 favicon 要先转 48px WebP 再跑 `npm run gen:icons`。
 - `scripts/fetch-favicons.py` 读取本机的 `/tmp/providers.json` 与 `/tmp/models-dev.json` 缓存并写入 `icons/`，不是安装或构建的必需步骤。
 - 贡献者用 npm（仓库带 `package-lock.json`）；用户安装时由 DSH 用 pnpm 拉包，两条链路互不影响。
 

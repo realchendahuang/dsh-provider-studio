@@ -1,0 +1,21 @@
+version: 2
+
+updates:
+  # esbuild is the only npm dependency that changes the shipped artifact; the
+  # runtime dependency ranges are pinned by the DSH contract instead.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  # Actions tags are pinned deliberately (checkout/setup-node v7); let the
+  # updater surface a new major instead of bumping silently.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2

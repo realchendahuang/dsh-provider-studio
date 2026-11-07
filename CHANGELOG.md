@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0 — 2026-11-07
+
+启动包大瘦身：logo 从 `client.js` 挪到随包资源按需加载，启动时不再传输 300 KB 图标；同时补覆盖率门禁、发布脚本与 CI 矩阵。
+
+- **logo 移到包资源**：`gen-icons.mjs` 生成 `assets/icons/<key>.<sha1-12>.<ext>`（内容哈希命名，资源路由返回 `immutable` 缓存），`src/client/icons.js` 只保留 key → `require.asset("plugins/<包名>/assets/icons/<file>")` 映射；`client.js` 581 KB → 196 KB，DSH 实际传输 gzip 232 KB → 55 KB，页面只拉实际出现的 logo
+- **`engines.dsh` 收紧到 `>=0.2.2-rc.1 <0.3.0-0`**：`/plugins/<包>/assets/` 资源路由从 DSH 0.2.2 才有，0.2.1 用户继续停留在 v1.2.4
+- **`package.json`**：新增 `"./assets/*": "./assets/*"` 导出与 `files: ["assets/"]`（缺任一条资源路由都会 404）
+- **门禁**：logo 必须落在 `assets/icons/` 且文件名内容哈希与文件字节一致、无孤儿资源、assets 体积预算；`client.js` 预算下调到 240 KB、`icons.js` 到 48 KB
+- **覆盖率门禁**：新增 `scripts/coverage.mjs` / `npm run test:coverage`，用 Node 内置覆盖率跑单测并在行 87% / 分支 82% / 函数 91% 处失败（v1.3.0 基线 88.9 / 84.1 / 92.9）；CI 改跑它，测试被删空也会红
+- **两段式发布脚本**：新增 `scripts/release.mjs`（`prepare` 只做本地可回退的 bump / CHANGELOG / README tag / 门禁 / commit / annotated tag；`publish` 在远端无同名 tag 时原子推送、等 CI 绿再建 Release），避免重演「tag 推错不可重打」
+- **CI 矩阵与仓库维护**：CI 扩到 ubuntu Node 22/24 + windows Node 22；新增 tag 推送守卫 workflow（annotated、版本一致、在 main 上）、Dependabot、README CI 徽章
+
 ## 1.2.4 — 2026-11-07
 
 收口一版：安装包瘦身近一半，探针修掉三个真实缺陷，门禁里几个「永远通过」的口子改成会失败。
