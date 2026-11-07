@@ -11,6 +11,12 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    ignore:
+      # DSH-internal prerelease packages are aligned by hand with the DSH
+      # runtime the plugin targets: Dependabot proposed 0.2.2-alpha.3, which is
+      # older than the accepted 0.2.2-rc.1 and pulls a cordis peer that
+      # conflicts with the root range (npm ci fails ERESOLVE).
+      - dependency-name: "@deepseek-ai/dsh-typert-protocol"
 
   # Actions tags are pinned deliberately (checkout/setup-node v7); let the
   # updater surface a new major instead of bumping silently.
